@@ -464,7 +464,7 @@ class PreviewViewController: UIViewController {
     }
     
     @objc private func savePDF() {
-        guard !splitImages.isEmpty else {
+        guard splitImages.count == 2 else {
             showError(AppError.invalidCropArea)
             return
         }
@@ -476,28 +476,15 @@ class PreviewViewController: UIViewController {
                 guard let self = self else { return }
                 
                 let pdfData = try PDFGenerator.shared.generatePDF(from: self.splitImages)
-                let fileName = "\(self.fileURL.deletingPathExtension().lastPathComponent)_split"
-                let savedURL = try PDFGenerator.shared.savePDF(data: pdfData, fileName: fileName)
+                let fileName = "\(self.fileURL.deletingPathExtension().lastPathComponent)_split.pdf"
                 
-                // 生成缩略图
-                let thumbnail = DocumentProcessor.shared.generateThumbnail(from: self.splitImages[0])
-                let thumbnailData = thumbnail?.pngData()
-                
-                let document = SplitDocument(
-                    name: fileName,
-                    originalFilePath: self.fileURL.path,
-                    documentType: self.documentType,
-                    orientation: self.documentOrientation,
-                    thumbnailData: thumbnailData
-                )
-                
-                var updatedDocument = document
-                updatedDocument.splitFilePaths = [savedURL.path]
-                LocalFileManager.shared.addDocument(updatedDocument)
+                // 保存到临时目录，然后让用户选择保存位置
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+                try pdfData.write(to: tempURL)
                 
                 DispatchQueue.main.async { [weak self] in
                     self?.activityIndicator.stopAnimating()
-                    self?.showSuccess("已保存为 1 份 2 页 PDF")
+                    self?.presentSaveDialog(fileURL: tempURL, fileName: fileName)
                 }
             } catch {
                 DispatchQueue.main.async { [weak self] in
@@ -508,8 +495,112 @@ class PreviewViewController: UIViewController {
         }
     }
     
+    // MARK: - 保存对话框
+    private func presentSaveDialog(fileURL: URL, fileName: String) {
+        // 选项1: 保存到本地应用目录（始终可用）
+        let saveLocal = UIAlertAction(title: "保存到应用（推荐）", style: .default) { [weak self] _ in
+            self?.saveToLocalApp(fileURL: fileURL, fileName: fileName)
+        }
+        
+        // 选项2: 通过系统分享保存（可保存到文件/ iCloud）
+        let saveViaSystem = UIAlertAction(title: "另存为...", style: .default) { [weak self] _ in
+            self?.presentDocumentPickerForSave(fileURL: fileURL, fileName: fileName)
+        }
+        
+        // 选项3: 复制到文件 App
+        let copyFiles = UIAlertAction(title: "复制到「文件」App", style: .default) { [weak self] _ in
+            self?.saveToFilesApp(fileURL: fileURL, fileName: fileName)
+        }
+        
+        let cancel = UIAlertAction(title: "取消", style: .cancel)
+        
+        let alert = UIAlertController(title: "保存 PDF", message: "选择保存方式", preferredStyle: .actionSheet)
+        alert.addAction(saveLocal)
+        alert.addAction(saveViaSystem)
+        alert.addAction(copyFiles)
+        alert.addAction(cancel)
+        
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = saveButton
+            popover.sourceRect = saveButton.bounds
+        }
+        
+        present(alert, animated: true)
+    }
+    
+    private func saveToLocalApp(fileURL: URL, fileName: String) {
+        do {
+            let savedURL = try PDFGenerator.shared.savePDF(data: try Data(contentsOf: fileURL), fileName: fileName.deletingPathExtension())
+            
+            // 记录到文件管理器
+            let thumbnail = DocumentProcessor.shared.generateThumbnail(from: splitImages[0])
+            let thumbnailData = thumbnail?.pngData()
+            
+            let document = SplitDocument(
+                name: fileName.deletingPathExtension(),
+                originalFilePath: self.fileURL.path,
+                documentType: self.documentType,
+                orientation: self.documentOrientation,
+                thumbnailData: thumbnailData
+            )
+            var updatedDocument = document
+            updatedDocument.splitFilePaths = [savedURL.path]
+            LocalFileManager.shared.addDocument(updatedDocument)
+            
+            let pathAlert = UIAlertController(
+                title: "保存成功",
+                message: "文件已保存到应用内部\n\n路径：SplitDocuments/\(fileName)",
+                preferredStyle: .alert
+            )
+            pathAlert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(pathAlert, animated: true)
+        } catch {
+            showError(error)
+        }
+    }
+    
+    private func presentDocumentPickerForSave(fileURL: URL, fileName: String) {
+        // 使用 UIDocumentPicker 以"导出"模式让用户选择目标位置
+        let tempDir = FileManager.default.temporaryDirectory
+        let exportURL = tempDir.appendingPathComponent(fileName)
+        try? FileManager.default.copyItem(at: fileURL, to: exportURL)
+        
+        // 使用 UIActivityViewController 带 "Save to Files" 让用户选位置
+        let activityVC = UIActivityViewController(
+            activityItems: [exportURL],
+            applicationActivities: nil
+        )
+        activityVC.completionWithItemsHandler = { [weak self] _, completed, _, _ in
+            if completed {
+                self?.showSuccess("已通过系统保存到指定位置")
+            }
+        }
+        
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = shareButton
+            popover.sourceRect = shareButton.bounds
+        }
+        
+        present(activityVC, animated: true)
+    }
+    
+    private func saveToFilesApp(fileURL: URL, fileName: String) {
+        // iOS 14+ 的 UIDocumentPicker for export
+        if #available(iOS 14.0, *) {
+            // 先确保临时文件存在
+            let tempDir = FileManager.default.temporaryDirectory
+            let exportURL = tempDir.appendingPathComponent(fileName)
+            try? FileManager.default.removeItem(at: exportURL)
+            try? FileManager.default.copyItem(at: fileURL, to: exportURL)
+            
+            let documentPicker = UIDocumentPickerViewController(forExporting: [exportURL])
+            documentPicker.delegate = self
+            present(documentPicker, animated: true)
+        }
+    }
+    
     @objc private func sharePDF() {
-        guard !splitImages.isEmpty else {
+        guard splitImages.count == 2 else {
             showError(AppError.invalidCropArea)
             return
         }
@@ -576,6 +667,23 @@ extension PreviewViewController: CropOverlayViewDelegate {
     
     func cropOverlayView(_ view: CropOverlayView, didEndChangingCropPosition position: CGFloat) {
         updateSplitPreview()
+    }
+}
+
+// MARK: - UIDocumentPickerDelegate
+extension PreviewViewController: UIDocumentPickerDelegate {
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let savedURL = urls.first else { return }
+        let pathAlert = UIAlertController(
+            title: "保存成功",
+            message: "文件已保存到：\n\(savedURL.lastPathComponent)",
+            preferredStyle: .alert
+        )
+        pathAlert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(pathAlert, animated: true)
+    }
+    
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
     }
 }
 

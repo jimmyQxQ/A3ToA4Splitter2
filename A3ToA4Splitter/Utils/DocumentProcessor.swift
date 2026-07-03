@@ -150,7 +150,19 @@ class DocumentProcessor {
     
     // MARK: - 图片裁切
     private func cropImage(_ cgImage: CGImage, rect: CGRect) -> UIImage? {
-        guard let croppedCGImage = cgImage.cropping(to: rect) else {
+        // 确保裁切区域在图片范围内，坐标取整防止越界
+        let imgWidth = CGFloat(cgImage.width)
+        let imgHeight = CGFloat(cgImage.height)
+        
+        let x = max(0, min(floor(rect.origin.x), imgWidth - 1))
+        let y = max(0, min(floor(rect.origin.y), imgHeight - 1))
+        let w = max(1, min(ceil(rect.size.width), imgWidth - x))
+        let h = max(1, min(ceil(rect.size.height), imgHeight - y))
+        
+        let safeRect = CGRect(x: x, y: y, width: w, height: h)
+        
+        guard let croppedCGImage = cgImage.cropping(to: safeRect) else {
+            print("裁切失败: rect=\(safeRect), imageSize=\(imgWidth)x\(imgHeight)")
             return nil
         }
         return UIImage(cgImage: croppedCGImage)

@@ -7,14 +7,16 @@ class PDFGenerator {
     
     private init() {}
     
-    // MARK: - 从图片生成PDF
-    func generatePDF(from images: [UIImage], dpi: CGFloat = Constants.pdfDPI) throws -> Data {
+    // MARK: - 从图片数组生成一份多页PDF
+    // 每张图片独占一页，使用标准 A4 尺寸 (72 points/inch)
+    func generatePDF(from images: [UIImage]) throws -> Data {
         guard !images.isEmpty else {
             throw AppError.pdfGenerationFailed
         }
         
-        let pageWidth = Constants.a4Width / 25.4 * dpi  // mm to inches to points
-        let pageHeight = Constants.a4Height / 25.4 * dpi
+        // A4 标准尺寸 (72 points/inch): 595.28 x 841.89 pt
+        let pageWidth: CGFloat = 595.28
+        let pageHeight: CGFloat = 841.89
         let pageSize = CGSize(width: pageWidth, height: pageHeight)
         
         let pdfMetadata: [String: Any] = [
