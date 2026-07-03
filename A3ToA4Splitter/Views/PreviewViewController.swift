@@ -479,6 +479,20 @@ class PreviewViewController: UIViewController {
                 print("[PreviewViewController] 开始生成PDF，splitImages[0]: \(self.splitImages[0].size), splitImages[1]: \(self.splitImages[1].size)")
                 let pdfData = try PDFGenerator.shared.generatePDF(from: self.splitImages)
                 print("[PreviewViewController] PDF生成成功，数据大小: \(pdfData.count) bytes")
+                
+                // 验证PDF页数
+                let verifyDoc = PDFDocument(data: pdfData)
+                let pageCount = verifyDoc?.pageCount ?? 0
+                print("[PreviewViewController] PDF验证页数: \(pageCount)")
+                
+                guard pageCount == 2 else {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.activityIndicator.stopAnimating()
+                        self?.showError(AppError.pdfGenerationFailed)
+                    }
+                    return
+                }
+                
                 let fileName = "\(self.fileURL.deletingPathExtension().lastPathComponent)_split.pdf"
                 
                 // 保存到临时目录，然后让用户选择保存位置
@@ -618,8 +632,21 @@ class PreviewViewController: UIViewController {
                 print("[PreviewViewController] 开始生成分享PDF")
                 let pdfData = try PDFGenerator.shared.generatePDF(from: self.splitImages)
                 print("[PreviewViewController] 分享PDF生成成功，数据大小: \(pdfData.count) bytes")
+                
+                // 验证PDF页数
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_share.pdf")
                 try pdfData.write(to: tempURL)
+                let verifyDoc = PDFDocument(url: tempURL)
+                let pageCount = verifyDoc?.pageCount ?? 0
+                print("[PreviewViewController] PDF验证页数: \(pageCount)")
+                
+                guard pageCount == 2 else {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.activityIndicator.stopAnimating()
+                        self?.showError(AppError.pdfGenerationFailed)
+                    }
+                    return
+                }
                 
                 DispatchQueue.main.async { [weak self] in
                     self?.activityIndicator.stopAnimating()

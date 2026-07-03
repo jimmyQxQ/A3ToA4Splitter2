@@ -19,49 +19,49 @@ class PDFGenerator {
         // A4 标准尺寸 (72 points/inch): 595.28 x 841.89 pt
         let pageWidth: CGFloat = 595.28
         let pageHeight: CGFloat = 841.89
-        let pageSize = CGSize(width: pageWidth, height: pageHeight)
         
-        let pdfMetadata: [String: Any] = [
-            kCGPDFContextCreator as String: "A3ToA4Splitter",
-            kCGPDFContextTitle as String: "Split Document",
-            kCGPDFContextAuthor as String: "A3ToA4Splitter App"
-        ]
-        
-        let format = UIGraphicsPDFRendererFormat()
-        format.documentInfo = pdfMetadata
-        
-        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: pageSize), format: format)
-        
-        let data = renderer.pdfData { context in
-            for (index, image) in images.enumerated() {
-                print("[PDFGenerator] 绘制第 \(index + 1) 页，图片尺寸: \(image.size.width) x \(image.size.height)")
-                if index > 0 {
-                    context.beginPage()
-                    print("[PDFGenerator] 已调用 beginPage() 开始第 \(index + 1) 页")
-                }
-                
-                let imageSize = image.size
-                let imageRatio = imageSize.width / imageSize.height
-                let pageRatio = pageSize.width / pageSize.height
-                
-                let drawRect: CGRect
-                if imageRatio > pageRatio {
-                    let newHeight = pageSize.width / imageRatio
-                    let yOffset = (pageSize.height - newHeight) / 2
-                    drawRect = CGRect(x: 0, y: yOffset, width: pageSize.width, height: newHeight)
-                } else {
-                    let newWidth = pageSize.height * imageRatio
-                    let xOffset = (pageSize.width - newWidth) / 2
-                    drawRect = CGRect(x: xOffset, y: 0, width: newWidth, height: pageSize.height)
-                }
-                
-                image.draw(in: drawRect)
-                print("[PDFGenerator] 第 \(index + 1) 页绘制完成，drawRect: \(drawRect)")
-            }
+        let pdfData = NSMutableData()
+        guard let consumer = CGDataConsumer(data: pdfData as CFMutableData) else {
+            throw AppError.pdfGenerationFailed
         }
         
-        print("[PDFGenerator] PDF生成完成，数据大小: \(data.count) bytes")
-        return data
+        var mediaBox = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
+        guard let pdfContext = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
+            throw AppError.pdfGenerationFailed
+        }
+        
+        for (index, image) in images.enumerated() {
+            print("[PDFGenerator] 绘制第 \(index + 1) 页，图片尺寸: \(image.size.width) x \(image.size.height)")
+            
+            pdfContext.beginPage(mediaBox: &mediaBox)
+            
+            let imageSize = image.size
+            let imageRatio = imageSize.width / imageSize.height
+            let pageRatio = pageWidth / pageHeight
+            
+            let drawRect: CGRect
+            if imageRatio > pageRatio {
+                let newHeight = pageWidth / imageRatio
+                let yOffset = (pageHeight - newHeight) / 2
+                drawRect = CGRect(x: 0, y: yOffset, width: pageWidth, height: newHeight)
+            } else {
+                let newWidth = pageHeight * imageRatio
+                let xOffset = (pageWidth - newWidth) / 2
+                drawRect = CGRect(x: xOffset, y: 0, width: newWidth, height: pageHeight)
+            }
+            
+            if let cgImage = image.cgImage {
+                pdfContext.draw(cgImage, in: drawRect)
+            }
+            
+            pdfContext.endPage()
+            print("[PDFGenerator] 第 \(index + 1) 页绘制完成")
+        }
+        
+        pdfContext.closePDF()
+        
+        print("[PDFGenerator] PDF生成完成，数据大小: \(pdfData.length) bytes")
+        return pdfData as Data
     }
     
     // MARK: - 保存PDF到文件
