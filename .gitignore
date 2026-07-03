@@ -1,0 +1,48 @@
+# A3ToA4Splitter
+# .gitignore - 忽略不应提交到仓库的文件
+
+# macOS / Xcode
+.DS_Store
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.xcworkspace
+!default.xcworkspace
+
+# 构建产物
+build/
+DerivedData/
+*.ipa
+*.app
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+Packages/
+Package.resolved
+
+# CocoaPods (如果后续使用)
+Pods/
+
+# Carthage (如果后续使用)
+Carthage/Build/
+
+# 临时文件
+*.tmp
+*.bak
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/

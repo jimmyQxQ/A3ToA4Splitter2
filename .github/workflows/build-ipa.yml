@@ -1,0 +1,116 @@
+name: Build iOS IPA
+
+on:
+  push:
+    tags:
+      - 'v*'       # 推送 v1.0.0 这样的 tag 时触发构建
+  workflow_dispatch:  # 也支持手动触发
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Unsigned IPA
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Show Xcode info
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes
+          xcode-select -p
+
+      - name: Build unsigned app
+        run: |
+          set -e
+          echo "====== 开始构建 A3ToA4Splitter ======"
+
+          xcodebuild \
+            -project A3ToA4Splitter.xcodeproj \
+            -scheme A3ToA4Splitter \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            clean build \
+            ONLY_ACTIVE_ARCH=YES \
+            | tee build/build.log
+
+          echo "====== 构建完成 ======"
+
+      - name: Locate .app bundle
+        run: |
+          APP_PATH=$(find build/DerivedData -name "A3ToA4Splitter.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "错误: 未找到 .app 文件"
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
+          echo "找到 app: $APP_PATH"
+
+      - name: Package IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R "$APP_PATH" build/Payload/
+          cd build
+          zip -r A3ToA4Splitter.ipa Payload
+          cd ..
+          echo "IPA 打包完成"
+          ls -lh build/A3ToA4Splitter.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: A3ToA4Splitter-unsigned
+          path: build/A3ToA4Splitter.ipa
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build/build.log
+          retention-days: 7
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: A3ToA4Splitter-unsigned
+          path: .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: A3ToA4Splitter.ipa
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
