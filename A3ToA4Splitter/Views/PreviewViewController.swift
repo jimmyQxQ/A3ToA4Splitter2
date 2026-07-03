@@ -335,15 +335,15 @@ class PreviewViewController: UIViewController {
                     }
                 }
                 
-                DispatchQueue.main.async {
-                    self.activityIndicator.stopAnimating()
-                    self.updateUI()
-                    self.updatePreviewImages()
+                DispatchQueue.main.async { [weak self] in
+                    self?.activityIndicator.stopAnimating()
+                    self?.updateUI()
+                    self?.updatePreviewImages()
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.activityIndicator.stopAnimating()
-                    self.showError(error)
+                DispatchQueue.main.async { [weak self] in
+                    self?.activityIndicator.stopAnimating()
+                    self?.showError(error)
                 }
             }
         }
@@ -372,7 +372,7 @@ class PreviewViewController: UIViewController {
         rightPreviewView.image = splitImages[1]
     }
     
-    private func updateSplitPreview() {
+    @objc private func updateSplitPreview() {
         guard let original = originalImage else { return }
         
         activityIndicator.startAnimating()
@@ -395,14 +395,14 @@ class PreviewViewController: UIViewController {
                     )
                 }
                 
-                DispatchQueue.main.async {
-                    self.activityIndicator.stopAnimating()
-                    self.updatePreviewImages()
+                DispatchQueue.main.async { [weak self] in
+                    self?.activityIndicator.stopAnimating()
+                    self?.updatePreviewImages()
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.activityIndicator.stopAnimating()
-                    self.showError(error)
+                DispatchQueue.main.async { [weak self] in
+                    self?.activityIndicator.stopAnimating()
+                    self?.showError(error)
                 }
             }
         }
@@ -478,14 +478,14 @@ class PreviewViewController: UIViewController {
                 updatedDocument.splitFilePaths = [savedURL.path]
                 LocalFileManager.shared.addDocument(updatedDocument)
                 
-                DispatchQueue.main.async {
-                    self.activityIndicator.stopAnimating()
-                    self.showSuccess("PDF已保存")
+                DispatchQueue.main.async { [weak self] in
+                    self?.activityIndicator.stopAnimating()
+                    self?.showSuccess("PDF已保存")
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.activityIndicator.stopAnimating()
-                    self.showError(error)
+                DispatchQueue.main.async { [weak self] in
+                    self?.activityIndicator.stopAnimating()
+                    self?.showError(error)
                 }
             }
         }
@@ -507,22 +507,22 @@ class PreviewViewController: UIViewController {
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_share.pdf")
                 try pdfData.write(to: tempURL)
                 
-                DispatchQueue.main.async {
-                    self.activityIndicator.stopAnimating()
+                DispatchQueue.main.async { [weak self] in
+                    self?.activityIndicator.stopAnimating()
                     
                     let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
                     
                     if let popover = activityVC.popoverPresentationController {
-                        popover.sourceView = self.shareButton
-                        popover.sourceRect = self.shareButton.bounds
+                        popover.sourceView = self?.shareButton
+                        popover.sourceRect = self?.shareButton.bounds ?? .zero
                     }
                     
-                    self.present(activityVC, animated: true)
+                    self?.present(activityVC, animated: true)
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.activityIndicator.stopAnimating()
-                    self.showError(error)
+                DispatchQueue.main.async { [weak self] in
+                    self?.activityIndicator.stopAnimating()
+                    self?.showError(error)
                 }
             }
         }

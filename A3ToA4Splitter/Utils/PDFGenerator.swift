@@ -17,14 +17,14 @@ class PDFGenerator {
         let pageHeight = Constants.a4Height / 25.4 * dpi
         let pageSize = CGSize(width: pageWidth, height: pageHeight)
         
-        let pdfMetadata: [AnyHashable: Any] = [
-            kCGPDFContextCreator: "A3ToA4Splitter",
-            kCGPDFContextTitle: "Split Document",
-            kCGPDFContextAuthor: "A3ToA4Splitter App"
+        let pdfMetadata: [String: Any] = [
+            kCGPDFContextCreator as String: "A3ToA4Splitter",
+            kCGPDFContextTitle as String: "Split Document",
+            kCGPDFContextAuthor as String: "A3ToA4Splitter App"
         ]
         
         let format = UIGraphicsPDFRendererFormat()
-        format.documentInfo = pdfMetadata as [String: Any]
+        format.documentInfo = pdfMetadata
         
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: pageSize), format: format)
         
