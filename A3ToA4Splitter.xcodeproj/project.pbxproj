@@ -20,6 +20,7 @@
 		A1000015 /* CropOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000014 /* CropOverlayView.swift */; };
 		A1000017 /* DocumentCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000016 /* DocumentCell.swift */; };
 		A1000019 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A1000018 /* LaunchScreen.storyboard */; };
+		A1000024 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000022 /* Assets.xcassets */; };
 	A1000020 /* A3ToA4SplitterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100001F /* A3ToA4SplitterTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -51,6 +52,7 @@
 		A100001C /* A3ToA4Splitter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = A3ToA4Splitter.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A100001D /* A3ToA4SplitterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = A3ToA4SplitterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A100001F /* A3ToA4SplitterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = A3ToA4SplitterTests.swift; sourceTree = "<group>"; };
+		A1000022 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -138,6 +140,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000018 /* LaunchScreen.storyboard */,
+				A1000022 /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -229,6 +232,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000019 /* LaunchScreen.storyboard in Resources */,
+				A1000024 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
