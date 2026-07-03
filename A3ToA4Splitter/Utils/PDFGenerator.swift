@@ -29,7 +29,7 @@ class PDFGenerator {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: pageSize), format: format)
         
         let data = renderer.pdfData { context in
-            for (index, image) in images {
+            for (index, image) in images.enumerated() {
                 if index > 0 {
                     context.beginPage()
                 }
