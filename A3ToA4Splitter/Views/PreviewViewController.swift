@@ -94,6 +94,16 @@ class PreviewViewController: UIViewController {
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
+
+    private let outputInfoLabel: UILabel = {
+        let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 13, weight: .medium)
+        label.textColor = .systemBlue
+        label.textAlignment = .center
+        label.numberOfLines = 1
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
     
     private let slider: UISlider = {
         let slider = UISlider()
@@ -208,6 +218,7 @@ class PreviewViewController: UIViewController {
         
         view.addSubview(previewSegmentControl)
         view.addSubview(infoLabel)
+        view.addSubview(outputInfoLabel)
         view.addSubview(sliderLabel)
         view.addSubview(slider)
         view.addSubview(resetButton)
@@ -226,6 +237,7 @@ class PreviewViewController: UIViewController {
             imageContainerView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             imageContainerView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             imageContainerView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            imageContainerView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             imageContainerView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
             
             originalImageView.topAnchor.constraint(equalTo: imageContainerView.topAnchor),
@@ -261,7 +273,11 @@ class PreviewViewController: UIViewController {
             infoLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             infoLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
-            sliderLabel.topAnchor.constraint(equalTo: infoLabel.bottomAnchor, constant: 12),
+            outputInfoLabel.topAnchor.constraint(equalTo: infoLabel.bottomAnchor, constant: 6),
+            outputInfoLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            outputInfoLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            
+            sliderLabel.topAnchor.constraint(equalTo: outputInfoLabel.bottomAnchor, constant: 12),
             sliderLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             
             resetButton.centerYAnchor.constraint(equalTo: sliderLabel.centerYAnchor),
@@ -361,6 +377,7 @@ class PreviewViewController: UIViewController {
         infoLabel.text = String(format: "原始尺寸: %.0f x %.0f 像素 | 方向: %@",
                                 size.width, size.height,
                                 documentOrientation == .landscape ? "横向A3" : "纵向A3")
+        outputInfoLabel.text = "将输出 1 份 2 页 A4 PDF"
         
         slider.value = 0.5
     }
@@ -480,7 +497,7 @@ class PreviewViewController: UIViewController {
                 
                 DispatchQueue.main.async { [weak self] in
                     self?.activityIndicator.stopAnimating()
-                    self?.showSuccess("PDF已保存")
+                    self?.showSuccess("已保存为 1 份 2 页 PDF")
                 }
             } catch {
                 DispatchQueue.main.async { [weak self] in

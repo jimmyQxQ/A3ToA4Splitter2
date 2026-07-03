@@ -27,8 +27,10 @@ class DocumentProcessor {
             throw AppError.importFailed("无法读取图片文件")
         }
         
-        let orientation = detectOrientation(image: image)
-        return (image, orientation)
+        // 规范化图片，消除 EXIF 方向影响，确保 image.size 与 cgImage 尺寸一致
+        let normalizedImage = image.normalized()
+        let orientation = detectOrientation(image: normalizedImage)
+        return (normalizedImage, orientation)
     }
     
     func detectOrientation(image: UIImage) -> DocumentOrientation {
@@ -156,22 +158,30 @@ class DocumentProcessor {
     
     // MARK: - 缩放到A4比例
     private func scaleToA4(image: UIImage, targetOrientation: DocumentOrientation) -> UIImage {
-        let targetRatio: CGFloat = targetOrientation == .portrait ? 
-            (Constants.a4Width / Constants.a4Height) : 
+        let targetRatio: CGFloat = targetOrientation == .portrait ?
+            (Constants.a4Width / Constants.a4Height) :
             (Constants.a4Height / Constants.a4Width)
         
-        let currentSize = image.size
-        let currentRatio = currentSize.width / currentSize.height
+        var workingImage = image
+        let currentRatio = image.size.width / image.size.height
+        let isCurrentLandscape = currentRatio > 1.0
+        let isTargetLandscape = targetOrientation == .landscape
         
-        var targetSize: CGSize
+        // 如果当前方向与目标方向不一致，先旋转90度
+        if isCurrentLandscape != isTargetLandscape {
+            workingImage = rotateImage(workingImage, by: 90) ?? workingImage
+        }
         
-        if abs(currentRatio - targetRatio) < 0.01 {
-            // 比例已经接近，直接返回
-            return image
+        let currentSize = workingImage.size
+        let adjustedRatio = currentSize.width / currentSize.height
+        
+        if abs(adjustedRatio - targetRatio) < 0.01 {
+            return workingImage
         }
         
         // 调整尺寸以匹配A4比例
-        if currentRatio > targetRatio {
+        var targetSize: CGSize
+        if adjustedRatio > targetRatio {
             let newHeight = currentSize.width / targetRatio
             targetSize = CGSize(width: currentSize.width, height: newHeight)
         } else {
@@ -189,7 +199,7 @@ class DocumentProcessor {
             context.fill(CGRect(origin: .zero, size: targetSize))
             
             let drawRect: CGRect
-            if currentRatio > targetRatio {
+            if adjustedRatio > targetRatio {
                 let drawHeight = currentSize.width / targetRatio
                 let yOffset = (drawHeight - currentSize.height) / 2
                 drawRect = CGRect(x: 0, y: yOffset, width: currentSize.width, height: currentSize.height)
@@ -199,10 +209,30 @@ class DocumentProcessor {
                 drawRect = CGRect(x: xOffset, y: 0, width: currentSize.width, height: currentSize.height)
             }
             
-            image.draw(in: drawRect)
+            workingImage.draw(in: drawRect)
         }
         
         return scaledImage
+    }
+    
+    // MARK: - 旋转图片
+    private func rotateImage(_ image: UIImage, by degrees: CGFloat) -> UIImage? {
+        let radians = degrees * .pi / 180
+        let rotatedSize = CGRect(origin: .zero, size: image.size)
+            .applying(CGAffineTransform(rotationAngle: radians))
+            .integral.size
+        
+        UIGraphicsBeginImageContextWithOptions(rotatedSize, false, image.scale)
+        guard let context = UIGraphicsGetCurrentContext() else { return nil }
+        
+        context.translateBy(x: rotatedSize.width / 2, y: rotatedSize.height / 2)
+        context.rotate(by: radians)
+        image.draw(in: CGRect(x: -image.size.width / 2, y: -image.size.height / 2,
+                               width: image.size.width, height: image.size.height))
+        
+        let rotatedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return rotatedImage
     }
     
     // MARK: - 生成缩略图
@@ -259,5 +289,20 @@ class DocumentProcessor {
         }
         
         return previewImage
+    }
+}
+
+// MARK: - UIImage Extension
+extension UIImage {
+    /// 规范化图片，消除 EXIF 方向影响
+    /// 确保 image.size 与 cgImage 尺寸方向一致
+    func normalized() -> UIImage {
+        if imageOrientation == .up { return self }
+        
+        UIGraphicsBeginImageContextWithOptions(size, false, scale)
+        draw(in: CGRect(origin: .zero, size: size))
+        let normalizedImage = UIGraphicsGetImageFromCurrentImageContext() ?? self
+        UIGraphicsEndImageContext()
+        return normalizedImage
     }
 }
