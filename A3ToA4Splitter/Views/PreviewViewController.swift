@@ -464,6 +464,7 @@ class PreviewViewController: UIViewController {
     }
     
     @objc private func savePDF() {
+        print("[PreviewViewController] 点击保存PDF，splitImages数量: \(splitImages.count)")
         guard splitImages.count == 2 else {
             showError(AppError.invalidCropArea)
             return
@@ -475,7 +476,9 @@ class PreviewViewController: UIViewController {
             do {
                 guard let self = self else { return }
                 
+                print("[PreviewViewController] 开始生成PDF，splitImages[0]: \(self.splitImages[0].size), splitImages[1]: \(self.splitImages[1].size)")
                 let pdfData = try PDFGenerator.shared.generatePDF(from: self.splitImages)
+                print("[PreviewViewController] PDF生成成功，数据大小: \(pdfData.count) bytes")
                 let fileName = "\(self.fileURL.deletingPathExtension().lastPathComponent)_split.pdf"
                 
                 // 保存到临时目录，然后让用户选择保存位置
@@ -600,6 +603,7 @@ class PreviewViewController: UIViewController {
     }
     
     @objc private func sharePDF() {
+        print("[PreviewViewController] 点击分享PDF，splitImages数量: \(splitImages.count)")
         guard splitImages.count == 2 else {
             showError(AppError.invalidCropArea)
             return
@@ -611,7 +615,9 @@ class PreviewViewController: UIViewController {
             do {
                 guard let self = self else { return }
                 
+                print("[PreviewViewController] 开始生成分享PDF")
                 let pdfData = try PDFGenerator.shared.generatePDF(from: self.splitImages)
+                print("[PreviewViewController] 分享PDF生成成功，数据大小: \(pdfData.count) bytes")
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_share.pdf")
                 try pdfData.write(to: tempURL)
                 

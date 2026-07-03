@@ -10,7 +10,9 @@ class PDFGenerator {
     // MARK: - 从图片数组生成一份多页PDF
     // 每张图片独占一页，使用标准 A4 尺寸 (72 points/inch)
     func generatePDF(from images: [UIImage]) throws -> Data {
-        guard !images.isEmpty else {
+        print("[PDFGenerator] 开始生成PDF，传入图片数量: \(images.count)")
+        guard images.count == 2 else {
+            print("[PDFGenerator] 错误: 期望2张图片，实际传入 \(images.count) 张")
             throw AppError.pdfGenerationFailed
         }
         
@@ -32,15 +34,17 @@ class PDFGenerator {
         
         let data = renderer.pdfData { context in
             for (index, image) in images.enumerated() {
+                print("[PDFGenerator] 绘制第 \(index + 1) 页，图片尺寸: \(image.size.width) x \(image.size.height)")
                 if index > 0 {
                     context.beginPage()
+                    print("[PDFGenerator] 已调用 beginPage() 开始第 \(index + 1) 页")
                 }
                 
                 let imageSize = image.size
                 let imageRatio = imageSize.width / imageSize.height
                 let pageRatio = pageSize.width / pageSize.height
                 
-                var drawRect: CGRect
+                let drawRect: CGRect
                 if imageRatio > pageRatio {
                     let newHeight = pageSize.width / imageRatio
                     let yOffset = (pageSize.height - newHeight) / 2
@@ -52,9 +56,11 @@ class PDFGenerator {
                 }
                 
                 image.draw(in: drawRect)
+                print("[PDFGenerator] 第 \(index + 1) 页绘制完成，drawRect: \(drawRect)")
             }
         }
         
+        print("[PDFGenerator] PDF生成完成，数据大小: \(data.count) bytes")
         return data
     }
     

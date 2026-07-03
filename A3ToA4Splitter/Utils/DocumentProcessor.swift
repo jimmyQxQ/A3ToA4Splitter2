@@ -118,6 +118,11 @@ class DocumentProcessor {
             }
         }
         
+        print("[DocumentProcessor] 分割完成，生成图片数量: \(splitImages.count)")
+        for (i, img) in splitImages.enumerated() {
+            print("[DocumentProcessor] 分割图片 [\(i)]: \(img.size.width) x \(img.size.height)")
+        }
+        
         guard splitImages.count == 2 else {
             throw AppError.imageProcessingFailed
         }
