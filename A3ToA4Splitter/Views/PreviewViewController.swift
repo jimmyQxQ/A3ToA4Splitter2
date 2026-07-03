@@ -530,14 +530,14 @@ class PreviewViewController: UIViewController {
     
     private func saveToLocalApp(fileURL: URL, fileName: String) {
         do {
-            let savedURL = try PDFGenerator.shared.savePDF(data: try Data(contentsOf: fileURL), fileName: fileName.deletingPathExtension())
+            let savedURL = try PDFGenerator.shared.savePDF(data: try Data(contentsOf: fileURL), fileName: (fileName as NSString).deletingPathExtension)
             
             // 记录到文件管理器
             let thumbnail = DocumentProcessor.shared.generateThumbnail(from: splitImages[0])
             let thumbnailData = thumbnail?.pngData()
             
             let document = SplitDocument(
-                name: fileName.deletingPathExtension(),
+                name: (fileName as NSString).deletingPathExtension,
                 originalFilePath: self.fileURL.path,
                 documentType: self.documentType,
                 orientation: self.documentOrientation,
