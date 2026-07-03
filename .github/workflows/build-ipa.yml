@@ -33,7 +33,7 @@ jobs:
 
       - name: Build unsigned app
         run: |
-          set -e
+          mkdir -p build
           echo "====== 开始构建 A3ToA4Splitter ======"
 
           xcodebuild \
@@ -50,7 +50,7 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             clean build \
             ONLY_ACTIVE_ARCH=YES \
-            | tee build/build.log
+            2>&1 | tee build/build.log
 
           echo "====== 构建完成 ======"
 
