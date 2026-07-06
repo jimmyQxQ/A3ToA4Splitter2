@@ -137,7 +137,7 @@ class MainViewController: UIViewController {
     
     private let guideStepsLabel: UILabel = {
         let label = UILabel()
-        label.text = "1. 点击导入文档按钮\n2. 选择A3尺寸的图片或PDF\n3. 调整裁切线位置\n4. 预览并保存分割后的A4文件"
+        label.text = "1. 点击导入文档按钮\n2. 选择A3尺寸的图片或PDF\n3. 预览原始文档与分割效果\n4. 保存或分享分割后的A4文件"
         label.font = UIFont.systemFont(ofSize: 13)
         label.textColor = .secondaryLabel
         label.numberOfLines = 0

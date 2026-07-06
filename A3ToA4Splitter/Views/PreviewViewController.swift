@@ -4,31 +4,23 @@ import PDFKit
 class PreviewViewController: UIViewController {
     
     // MARK: - UI Components
+    // 原始预览：水平滚动显示所有A3页面
     private let scrollView: UIScrollView = {
         let sv = UIScrollView()
         sv.translatesAutoresizingMaskIntoConstraints = false
-        sv.minimumZoomScale = 0.5
-        sv.maximumZoomScale = 3.0
+        sv.showsHorizontalScrollIndicator = true
         return sv
     }()
     
-    private let imageContainerView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
+    private let originalPreviewStackView: UIStackView = {
+        let sv = UIStackView()
+        sv.axis = .horizontal
+        sv.spacing = 12
+        sv.alignment = .fill
+        sv.distribution = .fillEqually
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
     }()
-    
-    private let originalImageView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFit
-        iv.backgroundColor = .systemGray6
-        iv.layer.cornerRadius = 8
-        iv.clipsToBounds = true
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
-    }()
-    
-    private let cropOverlayView = CropOverlayView()
     
     private let pageIndicatorLabel: UILabel = {
         let label = UILabel()
@@ -47,24 +39,6 @@ class PreviewViewController: UIViewController {
         sc.selectedSegmentIndex = 0
         sc.translatesAutoresizingMaskIntoConstraints = false
         return sc
-    }()
-    
-    // 原始页面缩略图条
-    private let originalThumbnailsScrollView: UIScrollView = {
-        let sv = UIScrollView()
-        sv.translatesAutoresizingMaskIntoConstraints = false
-        sv.showsHorizontalScrollIndicator = true
-        return sv
-    }()
-    
-    private let originalThumbnailsStackView: UIStackView = {
-        let sv = UIStackView()
-        sv.axis = .horizontal
-        sv.spacing = 8
-        sv.alignment = .fill
-        sv.distribution = .fillEqually
-        sv.translatesAutoresizingMaskIntoConstraints = false
-        return sv
     }()
     
     // 分割预览：水平滚动显示所有页面
@@ -104,32 +78,6 @@ class PreviewViewController: UIViewController {
         label.numberOfLines = 1
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
-    }()
-    
-    private let slider: UISlider = {
-        let slider = UISlider()
-        slider.minimumValue = 0.1
-        slider.maximumValue = 0.9
-        slider.value = 0.5
-        slider.translatesAutoresizingMaskIntoConstraints = false
-        return slider
-    }()
-    
-    private let sliderLabel: UILabel = {
-        let label = UILabel()
-        label.text = "裁切位置"
-        label.font = UIFont.systemFont(ofSize: 13)
-        label.textColor = .secondaryLabel
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private let resetButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("重置", for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 14)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
     }()
     
     private let actionStackView: UIStackView = {
@@ -176,13 +124,11 @@ class PreviewViewController: UIViewController {
     private let fileURL: URL
     private let documentType: DocumentType
     var existingDocument: SplitDocument?
-    private var pdfTotalPages: Int = 1  // 原始PDF的总页数（图片为1）
+    private var pdfTotalPages: Int = 1
     
-    private var originalImage: UIImage?
     private var originalPageThumbnails: [UIImage] = []
     private var pdfDocument: PDFDocument?
     private var documentOrientation: DocumentOrientation = .landscape
-    private var cropConfig = CropConfiguration.default
     private var splitImages: [UIImage] = []
     
     // MARK: - Initialization
@@ -206,28 +152,20 @@ class PreviewViewController: UIViewController {
     
     // MARK: - Setup
     private func setupUI() {
-        title = "预览与编辑"
+        title = "预览"
         view.backgroundColor = .systemBackground
         
         view.addSubview(previewSegmentControl)
         
+        scrollView.addSubview(originalPreviewStackView)
         view.addSubview(scrollView)
-        scrollView.addSubview(imageContainerView)
-        imageContainerView.addSubview(originalImageView)
-        imageContainerView.addSubview(cropOverlayView)
         view.addSubview(pageIndicatorLabel)
         
         splitPreviewScrollView.addSubview(splitPreviewStackView)
         view.addSubview(splitPreviewScrollView)
         
-        originalThumbnailsScrollView.addSubview(originalThumbnailsStackView)
-        view.addSubview(originalThumbnailsScrollView)
-        
         view.addSubview(infoLabel)
         view.addSubview(outputInfoLabel)
-        view.addSubview(sliderLabel)
-        view.addSubview(slider)
-        view.addSubview(resetButton)
         view.addSubview(actionStackView)
         actionStackView.addArrangedSubview(saveButton)
         actionStackView.addArrangedSubview(shareButton)
@@ -238,28 +176,17 @@ class PreviewViewController: UIViewController {
             previewSegmentControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
             previewSegmentControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             
-            // 原始预览主窗口
+            // 原始预览：水平滚动显示所有A3页面
             scrollView.topAnchor.constraint(equalTo: previewSegmentControl.bottomAnchor, constant: 12),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             scrollView.heightAnchor.constraint(equalToConstant: 220),
             
-            imageContainerView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            imageContainerView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            imageContainerView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            imageContainerView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            imageContainerView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-            imageContainerView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
-            
-            originalImageView.topAnchor.constraint(equalTo: imageContainerView.topAnchor),
-            originalImageView.leadingAnchor.constraint(equalTo: imageContainerView.leadingAnchor),
-            originalImageView.trailingAnchor.constraint(equalTo: imageContainerView.trailingAnchor),
-            originalImageView.bottomAnchor.constraint(equalTo: imageContainerView.bottomAnchor),
-            
-            cropOverlayView.topAnchor.constraint(equalTo: originalImageView.topAnchor),
-            cropOverlayView.leadingAnchor.constraint(equalTo: originalImageView.leadingAnchor),
-            cropOverlayView.trailingAnchor.constraint(equalTo: originalImageView.trailingAnchor),
-            cropOverlayView.bottomAnchor.constraint(equalTo: originalImageView.bottomAnchor),
+            originalPreviewStackView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            originalPreviewStackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            originalPreviewStackView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            originalPreviewStackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            originalPreviewStackView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
             
             pageIndicatorLabel.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -8),
             pageIndicatorLabel.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
@@ -278,20 +205,8 @@ class PreviewViewController: UIViewController {
             splitPreviewStackView.bottomAnchor.constraint(equalTo: splitPreviewScrollView.bottomAnchor),
             splitPreviewStackView.heightAnchor.constraint(equalTo: splitPreviewScrollView.heightAnchor),
             
-            // 原始页面缩略图条（在原始预览下方）
-            originalThumbnailsScrollView.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 8),
-            originalThumbnailsScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            originalThumbnailsScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            originalThumbnailsScrollView.heightAnchor.constraint(equalToConstant: 70),
-            
-            originalThumbnailsStackView.topAnchor.constraint(equalTo: originalThumbnailsScrollView.topAnchor),
-            originalThumbnailsStackView.leadingAnchor.constraint(equalTo: originalThumbnailsScrollView.leadingAnchor),
-            originalThumbnailsStackView.trailingAnchor.constraint(equalTo: originalThumbnailsScrollView.trailingAnchor),
-            originalThumbnailsStackView.bottomAnchor.constraint(equalTo: originalThumbnailsScrollView.bottomAnchor),
-            originalThumbnailsStackView.heightAnchor.constraint(equalTo: originalThumbnailsScrollView.heightAnchor),
-            
             // 信息区
-            infoLabel.topAnchor.constraint(equalTo: originalThumbnailsScrollView.bottomAnchor, constant: 8),
+            infoLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 16),
             infoLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             infoLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
@@ -299,17 +214,7 @@ class PreviewViewController: UIViewController {
             outputInfoLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             outputInfoLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
-            sliderLabel.topAnchor.constraint(equalTo: outputInfoLabel.bottomAnchor, constant: 12),
-            sliderLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            
-            resetButton.centerYAnchor.constraint(equalTo: sliderLabel.centerYAnchor),
-            resetButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            
-            slider.topAnchor.constraint(equalTo: sliderLabel.bottomAnchor, constant: 8),
-            slider.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            slider.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            
-            actionStackView.topAnchor.constraint(equalTo: slider.bottomAnchor, constant: 16),
+            actionStackView.topAnchor.constraint(equalTo: outputInfoLabel.bottomAnchor, constant: 24),
             actionStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             actionStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             actionStackView.heightAnchor.constraint(equalToConstant: 48),
@@ -321,21 +226,12 @@ class PreviewViewController: UIViewController {
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
-        
-        scrollView.delegate = self
-        cropOverlayView.delegate = self
     }
     
     private func setupActions() {
         previewSegmentControl.addTarget(self, action: #selector(segmentChanged), for: .valueChanged)
-        slider.addTarget(self, action: #selector(sliderValueChanged), for: .valueChanged)
-        resetButton.addTarget(self, action: #selector(resetCrop), for: .touchUpInside)
         saveButton.addTarget(self, action: #selector(savePDF), for: .touchUpInside)
         shareButton.addTarget(self, action: #selector(sharePDF), for: .touchUpInside)
-        
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(imageTapped))
-        originalImageView.isUserInteractionEnabled = true
-        originalImageView.addGestureRecognizer(tapGesture)
     }
     
     // MARK: - Document Loading
@@ -348,9 +244,8 @@ class PreviewViewController: UIViewController {
                 
                 if self.documentType == .image {
                     let (image, orientation) = try DocumentProcessor.shared.importImage(from: self.fileURL)
-                    self.originalImage = image
-                    self.originalPageThumbnails = [image]
                     self.documentOrientation = orientation
+                    self.originalPageThumbnails = [image]
                     self.splitImages = try DocumentProcessor.shared.splitA3ToA4(image: image, orientation: orientation)
                 } else {
                     let (pdf, orientation) = try DocumentProcessor.shared.importPDF(from: self.fileURL)
@@ -385,9 +280,6 @@ class PreviewViewController: UIViewController {
                         }
                         self.originalPageThumbnails.append(thumbImage)
                     }
-                    
-                    // 第一页作为主预览图
-                    self.originalImage = self.originalPageThumbnails.first
                 }
                 
                 print("[PreviewViewController] 加载完成，splitImages数量: \(self.splitImages.count)，原始缩略图数量: \(self.originalPageThumbnails.count)")
@@ -395,8 +287,8 @@ class PreviewViewController: UIViewController {
                 DispatchQueue.main.async { [weak self] in
                     self?.activityIndicator.stopAnimating()
                     self?.updateUI()
+                    self?.updateOriginalPreview()
                     self?.updatePreviewImages()
-                    self?.updateOriginalThumbnails()
                 }
             } catch {
                 print("[PreviewViewController] 加载文档失败: \(error.localizedDescription)")
@@ -409,26 +301,68 @@ class PreviewViewController: UIViewController {
     }
     
     private func updateUI() {
-        guard let image = originalImage else { return }
+        guard !originalPageThumbnails.isEmpty else { return }
         
-        originalImageView.image = image
-        cropOverlayView.documentOrientation = documentOrientation
-        cropOverlayView.cropPosition = 0.5
-        cropOverlayView.isHidden = false
-        
-        let size = image.size
-        infoLabel.text = String(format: "原始尺寸: %.0f x %.0f 像素 | 方向: %@",
+        let size = originalPageThumbnails[0].size
+        infoLabel.text = String(format: "原始尺寸: %.0f x %.0f 像素 | 方向: %@ | 共 %d 页",
                                 size.width, size.height,
-                                documentOrientation == .landscape ? "横向A3" : "纵向A3")
+                                documentOrientation == .landscape ? "横向A3" : "纵向A3",
+                                originalPageThumbnails.count)
         if pdfTotalPages > 1 {
             outputInfoLabel.text = "将输出 1 份 \(pdfTotalPages * 2) 页 A4 PDF（\(pdfTotalPages) 页 A3 → 每页分割为 2 页 A4）"
-            pageIndicatorLabel.text = "  第 1 / \(pdfTotalPages) 页  "
+            pageIndicatorLabel.text = "  共 \(pdfTotalPages) 页 A3  "
         } else {
             outputInfoLabel.text = "将输出 1 份 2 页 A4 PDF"
-            pageIndicatorLabel.text = "  第 1 / 1 页  "
+            pageIndicatorLabel.text = "  共 1 页 A3  "
         }
+    }
+    
+    private func updateOriginalPreview() {
+        guard !originalPageThumbnails.isEmpty else { return }
         
-        slider.value = 0.5
+        // 清空之前的原始预览
+        originalPreviewStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        for (index, image) in originalPageThumbnails.enumerated() {
+            let container = UIView()
+            container.translatesAutoresizingMaskIntoConstraints = false
+            
+            let imageView = UIImageView()
+            imageView.contentMode = .scaleAspectFit
+            imageView.backgroundColor = .systemGray6
+            imageView.layer.cornerRadius = 8
+            imageView.clipsToBounds = true
+            imageView.layer.borderWidth = 1
+            imageView.layer.borderColor = UIColor.systemGray4.cgColor
+            imageView.image = image
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            
+            let label = UILabel()
+            label.text = "A3-\(index + 1)"
+            label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+            label.textColor = .secondaryLabel
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            
+            container.addSubview(imageView)
+            container.addSubview(label)
+            
+            NSLayoutConstraint.activate([
+                imageView.topAnchor.constraint(equalTo: container.topAnchor),
+                imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                imageView.heightAnchor.constraint(equalToConstant: 200),
+                
+                label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
+                label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+                label.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+            ])
+            
+            // 每个预览容器固定宽度
+            container.widthAnchor.constraint(equalToConstant: 150).isActive = true
+            
+            originalPreviewStackView.addArrangedSubview(container)
+        }
     }
     
     private func updatePreviewImages() {
@@ -479,137 +413,13 @@ class PreviewViewController: UIViewController {
         }
     }
     
-    private func updateOriginalThumbnails() {
-        guard !originalPageThumbnails.isEmpty else { return }
-        
-        // 清空之前的缩略图
-        originalThumbnailsStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        
-        for (index, image) in originalPageThumbnails.enumerated() {
-            let container = UIView()
-            container.translatesAutoresizingMaskIntoConstraints = false
-            
-            let imageView = UIImageView()
-            imageView.contentMode = .scaleAspectFit
-            imageView.backgroundColor = .systemGray6
-            imageView.layer.cornerRadius = 4
-            imageView.clipsToBounds = true
-            imageView.layer.borderWidth = index == 0 ? 2 : 0
-            imageView.layer.borderColor = UIColor.systemBlue.cgColor
-            imageView.image = image
-            imageView.translatesAutoresizingMaskIntoConstraints = false
-            
-            let label = UILabel()
-            label.text = "\(index + 1)"
-            label.font = UIFont.systemFont(ofSize: 10, weight: .medium)
-            label.textColor = .white
-            label.textAlignment = .center
-            label.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-            label.layer.cornerRadius = 8
-            label.clipsToBounds = true
-            label.translatesAutoresizingMaskIntoConstraints = false
-            
-            container.addSubview(imageView)
-            container.addSubview(label)
-            
-            NSLayoutConstraint.activate([
-                imageView.topAnchor.constraint(equalTo: container.topAnchor),
-                imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                imageView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-                
-                label.topAnchor.constraint(equalTo: container.topAnchor, constant: 2),
-                label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -2),
-                label.widthAnchor.constraint(equalToConstant: 20),
-                label.heightAnchor.constraint(equalToConstant: 16)
-            ])
-            
-            // 每个缩略图固定宽度
-            container.widthAnchor.constraint(equalToConstant: 80).isActive = true
-            
-            originalThumbnailsStackView.addArrangedSubview(container)
-        }
-    }
-    
-    @objc private func updateSplitPreview() {
-        guard let original = originalImage else { return }
-        
-        activityIndicator.startAnimating()
-        
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            do {
-                guard let self = self else { return }
-                
-                if self.documentType == .image {
-                    self.splitImages = try DocumentProcessor.shared.splitA3ToA4(
-                        image: original,
-                        orientation: self.documentOrientation,
-                        cropConfig: self.cropConfig
-                    )
-                } else if let pdf = self.pdfDocument {
-                    if self.pdfTotalPages > 1 {
-                        self.splitImages = try DocumentProcessor.shared.splitAllPages(
-                            pdfDocument: pdf,
-                            orientation: self.documentOrientation,
-                            cropConfig: self.cropConfig
-                        )
-                    } else {
-                        self.splitImages = try DocumentProcessor.shared.splitA3ToA4(
-                            pdfDocument: pdf,
-                            orientation: self.documentOrientation,
-                            cropConfig: self.cropConfig
-                        )
-                    }
-                }
-                
-                DispatchQueue.main.async { [weak self] in
-                    self?.activityIndicator.stopAnimating()
-                    self?.updatePreviewImages()
-                }
-            } catch {
-                DispatchQueue.main.async { [weak self] in
-                    self?.activityIndicator.stopAnimating()
-                    self?.showError(error)
-                }
-            }
-        }
-    }
-    
     // MARK: - Actions
     @objc private func segmentChanged() {
         let isOriginal = previewSegmentControl.selectedSegmentIndex == 0
         
         scrollView.isHidden = !isOriginal
-        cropOverlayView.isHidden = !isOriginal
         pageIndicatorLabel.isHidden = !isOriginal
-        originalThumbnailsScrollView.isHidden = !isOriginal
         splitPreviewScrollView.isHidden = isOriginal
-    }
-    
-    @objc private func sliderValueChanged() {
-        let position = CGFloat(slider.value)
-        cropConfig.cropX = position
-        cropConfig.isManual = true
-        cropOverlayView.cropPosition = position
-        
-        // 延迟更新预览
-        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(updateSplitPreview), object: nil)
-        perform(#selector(updateSplitPreview), with: nil, afterDelay: 0.3)
-    }
-    
-    @objc private func resetCrop() {
-        cropConfig = .default
-        slider.value = 0.5
-        cropOverlayView.cropPosition = 0.5
-        updateSplitPreview()
-    }
-    
-    @objc private func imageTapped() {
-        guard let image = originalImage else { return }
-        
-        let previewVC = ImagePreviewViewController(image: image)
-        previewVC.modalPresentationStyle = .fullScreen
-        present(previewVC, animated: true)
     }
     
     @objc private func savePDF() {
@@ -833,33 +643,6 @@ class PreviewViewController: UIViewController {
     }
 }
 
-// MARK: - UIScrollViewDelegate
-extension PreviewViewController: UIScrollViewDelegate {
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return imageContainerView
-    }
-    
-    func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        // 居中显示缩放后的内容
-        let offsetX = max((scrollView.bounds.width - scrollView.contentSize.width) * 0.5, 0)
-        let offsetY = max((scrollView.bounds.height - scrollView.contentSize.height) * 0.5, 0)
-        scrollView.contentInset = UIEdgeInsets(top: offsetY, left: offsetX, bottom: offsetY, right: offsetX)
-    }
-}
-
-// MARK: - CropOverlayViewDelegate
-extension PreviewViewController: CropOverlayViewDelegate {
-    func cropOverlayView(_ view: CropOverlayView, didChangeCropPosition position: CGFloat) {
-        cropConfig.cropX = position
-        cropConfig.isManual = true
-        slider.value = Float(position)
-    }
-    
-    func cropOverlayView(_ view: CropOverlayView, didEndChangingCropPosition position: CGFloat) {
-        updateSplitPreview()
-    }
-}
-
 // MARK: - UIDocumentPickerDelegate
 extension PreviewViewController: UIDocumentPickerDelegate {
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
@@ -874,86 +657,5 @@ extension PreviewViewController: UIDocumentPickerDelegate {
     }
     
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-    }
-}
-
-// MARK: - Image Preview ViewController
-class ImagePreviewViewController: UIViewController {
-    
-    private let imageView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFit
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
-    }()
-    
-    private let scrollView: UIScrollView = {
-        let sv = UIScrollView()
-        sv.minimumZoomScale = 1.0
-        sv.maximumZoomScale = 4.0
-        sv.translatesAutoresizingMaskIntoConstraints = false
-        return sv
-    }()
-    
-    private let closeButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-        button.tintColor = .white
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-    
-    init(image: UIImage) {
-        super.init(nibName: nil, bundle: nil)
-        imageView.image = image
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .black
-        
-        view.addSubview(scrollView)
-        scrollView.addSubview(imageView)
-        view.addSubview(closeButton)
-        
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            
-            imageView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            imageView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            imageView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-            imageView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
-            
-            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
-            closeButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            closeButton.widthAnchor.constraint(equalToConstant: 40),
-            closeButton.heightAnchor.constraint(equalToConstant: 40)
-        ])
-        
-        scrollView.delegate = self
-        closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
-        
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(closeTapped))
-        tapGesture.numberOfTapsRequired = 2
-        view.addGestureRecognizer(tapGesture)
-    }
-    
-    @objc private func closeTapped() {
-        dismiss(animated: true)
-    }
-}
-
-extension ImagePreviewViewController: UIScrollViewDelegate {
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return imageView
     }
 }
