@@ -113,7 +113,7 @@ class MainViewController: UIViewController {
         return sv
     }()
     
-    // 可折叠使用指南
+    // 使用指南（静态显示）
     private let guideView: UIView = {
         let view = UIView()
         view.backgroundColor = .secondarySystemBackground
@@ -122,29 +122,13 @@ class MainViewController: UIViewController {
         return view
     }()
     
-    private let guideHeaderLabel: UILabel = {
+    private let guideTitleLabel: UILabel = {
         let label = UILabel()
         label.text = "使用指南"
         label.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
         label.textColor = .label
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
-    }()
-    
-    private let guideChevron: UIImageView = {
-        let iv = UIImageView()
-        iv.image = UIImage(systemName: "chevron.down")
-        iv.tintColor = .secondaryLabel
-        iv.contentMode = .scaleAspectFit
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
-    }()
-    
-    private let guideContentView: UIView = {
-        let view = UIView()
-        view.clipsToBounds = true
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
     }()
     
     private let guideStepsLabel: UILabel = {
@@ -167,8 +151,6 @@ class MainViewController: UIViewController {
     
     // MARK: - Properties
     private var recentDocuments: [SplitDocument] = []
-    private var isGuideExpanded = false
-    private var guideContentHeightConstraint: NSLayoutConstraint!
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -176,7 +158,6 @@ class MainViewController: UIViewController {
         setupUI()
         setupActions()
         loadRecentDocuments()
-        collapseGuide()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -204,22 +185,10 @@ class MainViewController: UIViewController {
         emptyStateView.addSubview(emptyLabel)
         contentView.addSubview(recentFilesStackView)
         
-        // 使用指南（可折叠）
+        // 使用指南（静态）
         contentView.addSubview(guideView)
-        
-        // 指南 header 区域（可点击）
-        let guideHeaderContainer = UIView()
-        guideHeaderContainer.translatesAutoresizingMaskIntoConstraints = false
-        guideHeaderContainer.isUserInteractionEnabled = true
-        guideHeaderContainer.addSubview(guideHeaderLabel)
-        guideHeaderContainer.addSubview(guideChevron)
-        
-        let guideTapGesture = UITapGestureRecognizer(target: self, action: #selector(toggleGuide))
-        guideHeaderContainer.addGestureRecognizer(guideTapGesture)
-        
-        guideView.addSubview(guideHeaderContainer)
-        guideView.addSubview(guideContentView)
-        guideContentView.addSubview(guideStepsLabel)
+        guideView.addSubview(guideTitleLabel)
+        guideView.addSubview(guideStepsLabel)
         
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -254,7 +223,7 @@ class MainViewController: UIViewController {
             recentFilesLabel.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 20),
             recentFilesLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             
-            // 查看全部按钮（增强：带箭头图标，蓝色）
+            // 查看全部按钮
             viewAllButton.centerYAnchor.constraint(equalTo: recentFilesLabel.centerYAnchor),
             viewAllButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             
@@ -275,74 +244,29 @@ class MainViewController: UIViewController {
             recentFilesStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             recentFilesStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             
-            // 可折叠指南
+            // 静态指南
             guideView.topAnchor.constraint(equalTo: recentFilesStackView.bottomAnchor, constant: 20),
             guideView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             guideView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             guideView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24),
             
-            // 指南 header
-            guideHeaderContainer.topAnchor.constraint(equalTo: guideView.topAnchor),
-            guideHeaderContainer.leadingAnchor.constraint(equalTo: guideView.leadingAnchor, constant: 16),
-            guideHeaderContainer.trailingAnchor.constraint(equalTo: guideView.trailingAnchor, constant: -16),
-            guideHeaderContainer.heightAnchor.constraint(equalToConstant: 44),
+            guideTitleLabel.topAnchor.constraint(equalTo: guideView.topAnchor, constant: 12),
+            guideTitleLabel.leadingAnchor.constraint(equalTo: guideView.leadingAnchor, constant: 16),
+            guideTitleLabel.trailingAnchor.constraint(equalTo: guideView.trailingAnchor, constant: -16),
             
-            guideHeaderLabel.centerYAnchor.constraint(equalTo: guideHeaderContainer.centerYAnchor),
-            guideHeaderLabel.leadingAnchor.constraint(equalTo: guideHeaderContainer.leadingAnchor),
-            
-            guideChevron.centerYAnchor.constraint(equalTo: guideHeaderContainer.centerYAnchor),
-            guideChevron.trailingAnchor.constraint(equalTo: guideHeaderContainer.trailingAnchor),
-            guideChevron.widthAnchor.constraint(equalToConstant: 20),
-            guideChevron.heightAnchor.constraint(equalToConstant: 20),
-            
-            // 指南内容
-            guideContentView.topAnchor.constraint(equalTo: guideHeaderContainer.bottomAnchor),
-            guideContentView.leadingAnchor.constraint(equalTo: guideView.leadingAnchor, constant: 16),
-            guideContentView.trailingAnchor.constraint(equalTo: guideView.trailingAnchor, constant: -16),
-            guideContentView.bottomAnchor.constraint(equalTo: guideView.bottomAnchor, constant: -12),
-            
-            guideStepsLabel.topAnchor.constraint(equalTo: guideContentView.topAnchor),
-            guideStepsLabel.leadingAnchor.constraint(equalTo: guideContentView.leadingAnchor),
-            guideStepsLabel.trailingAnchor.constraint(equalTo: guideContentView.trailingAnchor),
-            guideStepsLabel.bottomAnchor.constraint(equalTo: guideContentView.bottomAnchor),
+            guideStepsLabel.topAnchor.constraint(equalTo: guideTitleLabel.bottomAnchor, constant: 8),
+            guideStepsLabel.leadingAnchor.constraint(equalTo: guideView.leadingAnchor, constant: 16),
+            guideStepsLabel.trailingAnchor.constraint(equalTo: guideView.trailingAnchor, constant: -16),
+            guideStepsLabel.bottomAnchor.constraint(equalTo: guideView.bottomAnchor, constant: -12),
             
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
-        
-        // 指南内容高度约束（用于折叠动画）
-        guideContentHeightConstraint = guideContentView.heightAnchor.constraint(equalToConstant: 0)
-        guideContentHeightConstraint.isActive = true
     }
     
     private func setupActions() {
         importButton.addTarget(self, action: #selector(importButtonTapped), for: .touchUpInside)
         viewAllButton.addTarget(self, action: #selector(viewAllButtonTapped), for: .touchUpInside)
-    }
-    
-    // MARK: - Guide Toggle
-    @objc private func toggleGuide() {
-        isGuideExpanded.toggle()
-        
-        UIView.animate(withDuration: 0.25) {
-            if self.isGuideExpanded {
-                self.guideContentHeightConstraint.constant = 0
-                self.guideContentView.alpha = 0
-                self.guideChevron.transform = .identity
-            } else {
-                self.guideContentHeightConstraint.constant = 100
-                self.guideContentView.alpha = 1
-                self.guideChevron.transform = CGAffineTransform(rotationAngle: .pi)
-            }
-            self.view.layoutIfNeeded()
-        }
-    }
-    
-    private func collapseGuide() {
-        isGuideExpanded = false
-        guideContentHeightConstraint.constant = 0
-        guideContentView.alpha = 0
-        guideChevron.transform = .identity
     }
     
     // MARK: - Data Loading

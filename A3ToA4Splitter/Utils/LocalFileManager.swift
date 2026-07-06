@@ -23,7 +23,12 @@ class LocalFileManager {
             
             loadDocuments()
         } catch {
-            fatalError("无法初始化文件管理器: \(error)")
+            print("[LocalFileManager] 初始化警告: \(error)")
+            // 使用临时目录作为后备
+            documentsPath = fileManager.temporaryDirectory
+            appFolder = documentsPath.appendingPathComponent("SplitDocumentsFallback", isDirectory: true)
+            metadataFile = appFolder.appendingPathComponent("documents_metadata.json")
+            try? fileManager.createDirectory(at: appFolder, withIntermediateDirectories: true, attributes: nil)
         }
     }
     
