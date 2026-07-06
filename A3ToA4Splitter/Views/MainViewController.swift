@@ -415,13 +415,23 @@ class MainViewController: UIViewController {
     private func importFromFiles() {
         let documentPicker: UIDocumentPickerViewController
         if #available(iOS 14.0, *) {
-            let supportedTypes: [UTType] = [.image, .pdf]
-            documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: supportedTypes)
+            // 使用精确的 UTType，确保 PDF 和常见图片格式都能被选择
+            let supportedTypes: [UTType] = [
+                .pdf,
+                .jpeg,
+                .png,
+                .heic,
+                .tiff,
+                .bmp,
+                .webP
+            ]
+            documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: supportedTypes, asCopy: true)
         } else {
             documentPicker = UIDocumentPickerViewController(documentTypes: [kUTTypeImage as String, kUTTypePDF as String], in: .import)
         }
         documentPicker.delegate = self
         documentPicker.allowsMultipleSelection = false
+        documentPicker.shouldShowFileExtensions = true
         present(documentPicker, animated: true)
     }
     
@@ -504,10 +514,23 @@ extension MainViewController: PHPickerViewControllerDelegate {
 // MARK: - UIDocumentPickerDelegate
 extension MainViewController: UIDocumentPickerDelegate {
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        guard let url = urls.first else { return }
+        guard let url = urls.first else {
+            print("[MainViewController] 未选择文件")
+            return
+        }
+        print("[MainViewController] 已选择文件: \(url.lastPathComponent), 路径: \(url.path)")
+        
+        // asCopy: true 时，URL 直接指向临时副本，无需安全范围访问
+        // 但仍需处理安全范围 URL（兼容非 asCopy 场景）
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessing { url.stopAccessingSecurityScopedResource() }
+        }
+        
         processImportedFile(at: url)
     }
     
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        print("[MainViewController] 用户取消了文件选择")
     }
 }
