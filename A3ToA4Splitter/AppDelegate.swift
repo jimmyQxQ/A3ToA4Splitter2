@@ -8,6 +8,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    // MARK: - 处理从其他应用传入的文件（后备方案，iOS 13+ 主要由 SceneDelegate 处理）
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        print("[AppDelegate] 收到传入文件: \(url.lastPathComponent)")
+        // 通知 SceneDelegate 处理（如果场景已激活）
+        NotificationCenter.default.post(name: .init("OpenInFileReceived"), object: url)
+        return true
+    }
+
     // MARK: UISceneSession Lifecycle
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
