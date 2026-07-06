@@ -30,6 +30,18 @@ class PreviewViewController: UIViewController {
     
     private let cropOverlayView = CropOverlayView()
     
+    private let pageIndicatorLabel: UILabel = {
+        let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .white
+        label.textAlignment = .center
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        label.layer.cornerRadius = 10
+        label.clipsToBounds = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
     private let previewSegmentControl: UISegmentedControl = {
         let sc = UISegmentedControl(items: ["原始", "分割预览"])
         sc.selectedSegmentIndex = 0
@@ -37,52 +49,23 @@ class PreviewViewController: UIViewController {
         return sc
     }()
     
-    private let leftPreviewView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFit
-        iv.backgroundColor = .systemGray6
-        iv.layer.cornerRadius = 8
-        iv.clipsToBounds = true
-        iv.layer.borderWidth = 1
-        iv.layer.borderColor = UIColor.systemBlue.cgColor
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.isHidden = true
-        return iv
+    // 分割预览：水平滚动显示所有页面
+    private let splitPreviewScrollView: UIScrollView = {
+        let sv = UIScrollView()
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        sv.showsHorizontalScrollIndicator = true
+        sv.isHidden = true
+        return sv
     }()
     
-    private let rightPreviewView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFit
-        iv.backgroundColor = .systemGray6
-        iv.layer.cornerRadius = 8
-        iv.clipsToBounds = true
-        iv.layer.borderWidth = 1
-        iv.layer.borderColor = UIColor.systemBlue.cgColor
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.isHidden = true
-        return iv
-    }()
-    
-    private let leftLabel: UILabel = {
-        let label = UILabel()
-        label.text = "A4-1"
-        label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-        label.textColor = .systemBlue
-        label.textAlignment = .center
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.isHidden = true
-        return label
-    }()
-    
-    private let rightLabel: UILabel = {
-        let label = UILabel()
-        label.text = "A4-2"
-        label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-        label.textColor = .systemBlue
-        label.textAlignment = .center
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.isHidden = true
-        return label
+    private let splitPreviewStackView: UIStackView = {
+        let sv = UIStackView()
+        sv.axis = .horizontal
+        sv.spacing = 12
+        sv.alignment = .fill
+        sv.distribution = .fillEqually
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
     }()
     
     private let infoLabel: UILabel = {
@@ -211,11 +194,10 @@ class PreviewViewController: UIViewController {
         scrollView.addSubview(imageContainerView)
         imageContainerView.addSubview(originalImageView)
         imageContainerView.addSubview(cropOverlayView)
+        view.addSubview(pageIndicatorLabel)
         
-        view.addSubview(leftPreviewView)
-        view.addSubview(rightPreviewView)
-        view.addSubview(leftLabel)
-        view.addSubview(rightLabel)
+        splitPreviewScrollView.addSubview(splitPreviewStackView)
+        view.addSubview(splitPreviewScrollView)
         
         view.addSubview(previewSegmentControl)
         view.addSubview(infoLabel)
@@ -251,23 +233,23 @@ class PreviewViewController: UIViewController {
             cropOverlayView.trailingAnchor.constraint(equalTo: originalImageView.trailingAnchor),
             cropOverlayView.bottomAnchor.constraint(equalTo: originalImageView.bottomAnchor),
             
-            leftPreviewView.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
-            leftPreviewView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            leftPreviewView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.45, constant: -20),
-            leftPreviewView.heightAnchor.constraint(equalToConstant: 200),
+            pageIndicatorLabel.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -8),
+            pageIndicatorLabel.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
+            pageIndicatorLabel.heightAnchor.constraint(equalToConstant: 24),
+            pageIndicatorLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
             
-            rightPreviewView.topAnchor.constraint(equalTo: leftPreviewView.topAnchor),
-            rightPreviewView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            rightPreviewView.widthAnchor.constraint(equalTo: leftPreviewView.widthAnchor),
-            rightPreviewView.heightAnchor.constraint(equalTo: leftPreviewView.heightAnchor),
+            splitPreviewScrollView.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            splitPreviewScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            splitPreviewScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            splitPreviewScrollView.heightAnchor.constraint(equalToConstant: 240),
             
-            leftLabel.topAnchor.constraint(equalTo: leftPreviewView.bottomAnchor, constant: 4),
-            leftLabel.centerXAnchor.constraint(equalTo: leftPreviewView.centerXAnchor),
+            splitPreviewStackView.topAnchor.constraint(equalTo: splitPreviewScrollView.topAnchor),
+            splitPreviewStackView.leadingAnchor.constraint(equalTo: splitPreviewScrollView.leadingAnchor),
+            splitPreviewStackView.trailingAnchor.constraint(equalTo: splitPreviewScrollView.trailingAnchor),
+            splitPreviewStackView.bottomAnchor.constraint(equalTo: splitPreviewScrollView.bottomAnchor),
+            splitPreviewStackView.heightAnchor.constraint(equalTo: splitPreviewScrollView.heightAnchor),
             
-            rightLabel.topAnchor.constraint(equalTo: rightPreviewView.bottomAnchor, constant: 4),
-            rightLabel.centerXAnchor.constraint(equalTo: rightPreviewView.centerXAnchor),
-            
-            previewSegmentControl.topAnchor.constraint(equalTo: leftLabel.bottomAnchor, constant: 12),
+            previewSegmentControl.topAnchor.constraint(equalTo: splitPreviewScrollView.bottomAnchor, constant: 12),
             previewSegmentControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             
             infoLabel.topAnchor.constraint(equalTo: previewSegmentControl.bottomAnchor, constant: 8),
@@ -391,18 +373,61 @@ class PreviewViewController: UIViewController {
                                 documentOrientation == .landscape ? "横向A3" : "纵向A3")
         if pdfTotalPages > 1 {
             outputInfoLabel.text = "将输出 1 份 \(pdfTotalPages * 2) 页 A4 PDF（\(pdfTotalPages) 页 A3 → 每页分割为 2 页 A4）"
+            pageIndicatorLabel.text = "  第 1 / \(pdfTotalPages) 页  "
         } else {
             outputInfoLabel.text = "将输出 1 份 2 页 A4 PDF"
+            pageIndicatorLabel.text = "  第 1 / 1 页  "
         }
         
         slider.value = 0.5
     }
     
     private func updatePreviewImages() {
-        guard splitImages.count >= 2 else { return }
+        guard !splitImages.isEmpty else { return }
         
-        leftPreviewView.image = splitImages[0]
-        rightPreviewView.image = splitImages[1]
+        // 清空之前的分割预览
+        splitPreviewStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        for (index, image) in splitImages.enumerated() {
+            let container = UIView()
+            container.translatesAutoresizingMaskIntoConstraints = false
+            
+            let imageView = UIImageView()
+            imageView.contentMode = .scaleAspectFit
+            imageView.backgroundColor = .systemGray6
+            imageView.layer.cornerRadius = 8
+            imageView.clipsToBounds = true
+            imageView.layer.borderWidth = 1
+            imageView.layer.borderColor = UIColor.systemBlue.cgColor
+            imageView.image = image
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            
+            let label = UILabel()
+            label.text = "A4-\(index + 1)"
+            label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+            label.textColor = .systemBlue
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            
+            container.addSubview(imageView)
+            container.addSubview(label)
+            
+            NSLayoutConstraint.activate([
+                imageView.topAnchor.constraint(equalTo: container.topAnchor),
+                imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                imageView.heightAnchor.constraint(equalToConstant: 200),
+                
+                label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
+                label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+                label.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+            ])
+            
+            // 每个预览容器固定宽度
+            container.widthAnchor.constraint(equalToConstant: 150).isActive = true
+            
+            splitPreviewStackView.addArrangedSubview(container)
+        }
     }
     
     @objc private func updateSplitPreview() {
@@ -455,10 +480,8 @@ class PreviewViewController: UIViewController {
         
         scrollView.isHidden = !isOriginal
         cropOverlayView.isHidden = !isOriginal
-        leftPreviewView.isHidden = isOriginal
-        rightPreviewView.isHidden = isOriginal
-        leftLabel.isHidden = isOriginal
-        rightLabel.isHidden = isOriginal
+        pageIndicatorLabel.isHidden = !isOriginal
+        splitPreviewScrollView.isHidden = isOriginal
     }
     
     @objc private func sliderValueChanged() {
@@ -712,6 +735,13 @@ class PreviewViewController: UIViewController {
 extension PreviewViewController: UIScrollViewDelegate {
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return imageContainerView
+    }
+    
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        // 居中显示缩放后的内容
+        let offsetX = max((scrollView.bounds.width - scrollView.contentSize.width) * 0.5, 0)
+        let offsetY = max((scrollView.bounds.height - scrollView.contentSize.height) * 0.5, 0)
+        scrollView.contentInset = UIEdgeInsets(top: offsetY, left: offsetX, bottom: offsetY, right: offsetX)
     }
 }
 
