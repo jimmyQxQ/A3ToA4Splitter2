@@ -31,10 +31,11 @@ jobs:
           xcrun simctl list runtimes
           xcode-select -p
 
-      - name: Build unsigned archive
+      - name: Build unsigned app
         run: |
-          mkdir -p build
-          echo "====== 开始归档 A3ToA4Splitter ======"
+          set -o pipefail
+          mkdir -p build/Products
+          echo "====== 开始构建 A3ToA4Splitter ======"
 
           xcodebuild \
             -project A3ToA4Splitter.xcodeproj \
@@ -42,43 +43,46 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -archivePath build/A3ToA4Splitter.xcarchive \
+            CONFIGURATION_BUILD_DIR="$(pwd)/build/Products" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            clean archive \
+            clean build \
             2>&1 | tee build/build.log
 
-          echo "====== 归档完成 ======"
+          echo "====== 构建完成 ======"
 
-      - name: Verify archive
+      - name: Verify app bundle
         run: |
-          ARCHIVE_APP="build/A3ToA4Splitter.xcarchive/Products/Applications/A3ToA4Splitter.app"
-          if [ ! -d "$ARCHIVE_APP" ]; then
-            echo "错误: xcarchive 中未找到 .app"
-            find build -name "*.app" -type d
+          APP_PATH="build/Products/A3ToA4Splitter.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "错误: 未找到 .app 文件"
+            echo "=== build/Products 目录内容 ==="
+            ls -la build/Products/ || true
+            echo "=== 全局搜索 .app ==="
+            find build -name "*.app" -type d || true
             exit 1
           fi
-          echo "找到归档 app: $ARCHIVE_APP"
+          echo "找到 app: $APP_PATH"
           echo "=== .app 内容 ==="
-          ls -la "$ARCHIVE_APP"
+          ls -la "$APP_PATH"
           echo ""
           echo "=== 查找可执行文件 ==="
-          find "$ARCHIVE_APP" -maxdepth 1 -type f
+          find "$APP_PATH" -maxdepth 1 -type f -exec ls -la {} \;
 
       - name: Package IPA
         run: |
           mkdir -p build/Payload
-          cp -R "build/A3ToA4Splitter.xcarchive/Products/Applications/A3ToA4Splitter.app" build/Payload/
+          cp -R "build/Products/A3ToA4Splitter.app" build/Payload/
           cd build
           zip -r A3ToA4Splitter.ipa Payload
           cd ..
           echo "IPA 打包完成"
           ls -lh build/A3ToA4Splitter.ipa
 
-      - name: Verify IPA contents
+      - name: Verify IPA
         run: |
           echo "=== IPA 内容 ==="
           unzip -l build/A3ToA4Splitter.ipa | grep -E "A3ToA4Splitter.app/|Payload"
