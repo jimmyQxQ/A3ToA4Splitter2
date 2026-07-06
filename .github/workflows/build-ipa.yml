@@ -1,133 +1,123 @@
-name: Build iOS IPA
+name: Build IPA
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  SCHEME: A3ToA4Splitter
+  CONFIGURATION: Release
+  SDK: iphoneos
 
 jobs:
   build:
-    name: Build Unsigned IPA
-    runs-on: macos-14
-    timeout-minutes: 30
+    runs-on: macos-15
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Xcode version
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '15.4'
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
 
-      - name: Show Xcode info
+      - name: Install ldid
         run: |
-          xcodebuild -version
-          xcrun simctl list runtimes
-          xcode-select -p
+          if ! command -v ldid &> /dev/null; then
+            brew install ldid
+          fi
+          ldid --version
 
-      - name: Build unsigned app
+      - name: Prepare Build Directory
         run: |
-          set -o pipefail
-          mkdir -p build/Products
-          xattr -w com.apple.xcode.CreatedByBuildSystem true build/Products
-          echo "====== 开始构建 A3ToA4Splitter ======"
+          rm -rf build
+          mkdir -p build
+          xattr -w com.apple.xcode.CreatedByBuildSystem true build
 
-          xcodebuild \
+      - name: Build Project
+        run: |
+          xcodebuild build \
             -project A3ToA4Splitter.xcodeproj \
-            -scheme A3ToA4Splitter \
-            -configuration Release \
-            -sdk iphoneos \
+            -scheme ${{ env.SCHEME }} \
+            -configuration ${{ env.CONFIGURATION }} \
+            -sdk ${{ env.SDK }} \
             -destination 'generic/platform=iOS' \
-            CONFIGURATION_BUILD_DIR="$(pwd)/build/Products" \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            clean build \
-            2>&1 | tee build/build.log
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            ARCHS="arm64" \
+            | tee build/build.log
 
-          echo "====== 构建完成 ======"
-
-      - name: Verify app bundle
+      - name: Locate and Sign App
         run: |
-          APP_PATH="build/Products/A3ToA4Splitter.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "错误: 未找到 .app 文件"
-            echo "=== build/Products 目录内容 ==="
-            ls -la build/Products/ || true
-            echo "=== 全局搜索 .app ==="
-            find build -name "*.app" -type d || true
+          echo "====== Locating .app bundle ======"
+          APP_PATH=$(find build -name "*.app" -type d | head -n 1)
+          echo "APP_PATH=$APP_PATH"
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app bundle not found"
+            find build -type d
             exit 1
           fi
-          echo "找到 app: $APP_PATH"
-          echo "=== .app 内容 ==="
+
+          BINARY_NAME=$(basename "$APP_PATH" .app)
+          echo "Binary name: $BINARY_NAME"
+          
+          # ldid 伪签名（TrollStore 必需）
+          echo "====== ldid signing ======"
+          ENTITLEMENTS="A3ToA4Splitter/A3ToA4Splitter.entitlements"
+          if [ -f "$ENTITLEMENTS" ]; then
+            ldid -S"$ENTITLEMENTS" "$APP_PATH/$BINARY_NAME"
+            echo "Signed with entitlements: $ENTITLEMENTS"
+          else
+            ldid -S "$APP_PATH/$BINARY_NAME"
+            echo "Signed without entitlements"
+          fi
+          
+          codesign -d --entitlements :- "$APP_PATH" 2>/dev/null || true
+
+          # 检查架构
+          echo "====== Checking architecture ======"
+          lipo -info "$APP_PATH/$BINARY_NAME"
+          file "$APP_PATH/$BINARY_NAME"
+
+          # 确保可执行权限
+          chmod +x "$APP_PATH/$BINARY_NAME"
+          ls -la "$APP_PATH/$BINARY_NAME"
+
+          echo "====== App bundle contents ======"
           ls -la "$APP_PATH"
-          echo ""
-          echo "=== 查找可执行文件 ==="
-          find "$APP_PATH" -maxdepth 1 -type f -exec ls -la {} \;
+          echo "====== Info.plist CFBundleExecutable ======"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP_PATH/Info.plist" || true
 
       - name: Package IPA
         run: |
-          mkdir -p build/Payload
-          cp -R "build/Products/A3ToA4Splitter.app" build/Payload/
-          cd build
+          APP_PATH=$(find build -name "*.app" -type d | head -n 1)
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          
+          echo "====== Payload contents ======"
+          ls -la Payload/
+          
           zip -r A3ToA4Splitter.ipa Payload
-          cd ..
-          echo "IPA 打包完成"
-          ls -lh build/A3ToA4Splitter.ipa
+          rm -rf Payload
+          ls -lh A3ToA4Splitter.ipa
 
-      - name: Verify IPA
-        run: |
-          echo "=== IPA 内容 ==="
-          unzip -l build/A3ToA4Splitter.ipa | grep -E "A3ToA4Splitter.app/|Payload"
-          echo ""
-          echo "=== 验证可执行文件 ==="
-          unzip -p build/A3ToA4Splitter.ipa "Payload/A3ToA4Splitter.app/A3ToA4Splitter" > /dev/null && echo "可执行文件存在" || echo "可执行文件不存在!"
-
-      - name: Upload IPA artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: A3ToA4Splitter-unsigned
-          path: build/A3ToA4Splitter.ipa
-          retention-days: 30
-          if-no-files-found: error
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build/build.log
-          retention-days: 7
-
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download IPA artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: A3ToA4Splitter-unsigned
-          path: .
+          name: A3ToA4Splitter-IPA
+          path: A3ToA4Splitter.ipa
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: A3ToA4Splitter.ipa
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+          name: Release ${{ github.ref_name }}
+          body: |
+            自动构建的 IPA 文件，适用于 TrollStore 安装。
+            - 版本：${{ github.ref_name }}
+            - 构建时间：${{ github.event.head_commit.timestamp }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
