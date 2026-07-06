@@ -49,7 +49,7 @@ jobs:
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             clean build \
-            ONLY_ACTIVE_ARCH=YES \
+            ONLY_ACTIVE_ARCH=NO \
             2>&1 | tee build/build.log
 
           echo "====== 构建完成 ======"
@@ -64,6 +64,23 @@ jobs:
           echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
           echo "找到 app: $APP_PATH"
 
+      - name: Verify app bundle
+        run: |
+          echo "=== .app 包内容 ==="
+          ls -la "$APP_PATH"
+          echo ""
+          echo "=== Info.plist CFBundleExecutable ==="
+          plutil -extract CFBundleExecutable raw "$APP_PATH/Info.plist" || cat "$APP_PATH/Info.plist" | grep -A1 "CFBundleExecutable"
+          echo ""
+          echo "=== 可执行文件权限 ==="
+          ls -la "$APP_PATH/A3ToA4Splitter" || echo "错误: 可执行文件不存在!"
+
+      - name: Fix executable permissions
+        run: |
+          chmod +x "$APP_PATH/A3ToA4Splitter"
+          echo "已设置可执行权限"
+          ls -la "$APP_PATH/A3ToA4Splitter"
+
       - name: Package IPA
         run: |
           mkdir -p build/Payload
@@ -73,6 +90,11 @@ jobs:
           cd ..
           echo "IPA 打包完成"
           ls -lh build/A3ToA4Splitter.ipa
+
+      - name: Verify IPA contents
+        run: |
+          echo "=== IPA 内容 ==="
+          unzip -l build/A3ToA4Splitter.ipa | grep -E "A3ToA4Splitter.app/|Payload"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
