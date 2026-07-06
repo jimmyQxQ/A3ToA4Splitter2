@@ -49,6 +49,24 @@ class PreviewViewController: UIViewController {
         return sc
     }()
     
+    // 原始页面缩略图条
+    private let originalThumbnailsScrollView: UIScrollView = {
+        let sv = UIScrollView()
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        sv.showsHorizontalScrollIndicator = true
+        return sv
+    }()
+    
+    private let originalThumbnailsStackView: UIStackView = {
+        let sv = UIStackView()
+        sv.axis = .horizontal
+        sv.spacing = 8
+        sv.alignment = .fill
+        sv.distribution = .fillEqually
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
+    }()
+    
     // 分割预览：水平滚动显示所有页面
     private let splitPreviewScrollView: UIScrollView = {
         let sv = UIScrollView()
@@ -161,6 +179,7 @@ class PreviewViewController: UIViewController {
     private var pdfTotalPages: Int = 1  // 原始PDF的总页数（图片为1）
     
     private var originalImage: UIImage?
+    private var originalPageThumbnails: [UIImage] = []
     private var pdfDocument: PDFDocument?
     private var documentOrientation: DocumentOrientation = .landscape
     private var cropConfig = CropConfiguration.default
@@ -190,6 +209,8 @@ class PreviewViewController: UIViewController {
         title = "预览与编辑"
         view.backgroundColor = .systemBackground
         
+        view.addSubview(previewSegmentControl)
+        
         view.addSubview(scrollView)
         scrollView.addSubview(imageContainerView)
         imageContainerView.addSubview(originalImageView)
@@ -199,7 +220,9 @@ class PreviewViewController: UIViewController {
         splitPreviewScrollView.addSubview(splitPreviewStackView)
         view.addSubview(splitPreviewScrollView)
         
-        view.addSubview(previewSegmentControl)
+        originalThumbnailsScrollView.addSubview(originalThumbnailsStackView)
+        view.addSubview(originalThumbnailsScrollView)
+        
         view.addSubview(infoLabel)
         view.addSubview(outputInfoLabel)
         view.addSubview(sliderLabel)
@@ -211,10 +234,15 @@ class PreviewViewController: UIViewController {
         view.addSubview(activityIndicator)
         
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            // segmentControl 在顶部
+            previewSegmentControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            previewSegmentControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            
+            // 原始预览主窗口
+            scrollView.topAnchor.constraint(equalTo: previewSegmentControl.bottomAnchor, constant: 12),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            scrollView.heightAnchor.constraint(equalToConstant: 280),
+            scrollView.heightAnchor.constraint(equalToConstant: 220),
             
             imageContainerView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             imageContainerView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
@@ -238,10 +266,11 @@ class PreviewViewController: UIViewController {
             pageIndicatorLabel.heightAnchor.constraint(equalToConstant: 24),
             pageIndicatorLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
             
-            splitPreviewScrollView.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            // 分割预览与原始预览同一位置
+            splitPreviewScrollView.topAnchor.constraint(equalTo: previewSegmentControl.bottomAnchor, constant: 12),
             splitPreviewScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             splitPreviewScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            splitPreviewScrollView.heightAnchor.constraint(equalToConstant: 240),
+            splitPreviewScrollView.heightAnchor.constraint(equalToConstant: 220),
             
             splitPreviewStackView.topAnchor.constraint(equalTo: splitPreviewScrollView.topAnchor),
             splitPreviewStackView.leadingAnchor.constraint(equalTo: splitPreviewScrollView.leadingAnchor),
@@ -249,10 +278,20 @@ class PreviewViewController: UIViewController {
             splitPreviewStackView.bottomAnchor.constraint(equalTo: splitPreviewScrollView.bottomAnchor),
             splitPreviewStackView.heightAnchor.constraint(equalTo: splitPreviewScrollView.heightAnchor),
             
-            previewSegmentControl.topAnchor.constraint(equalTo: splitPreviewScrollView.bottomAnchor, constant: 12),
-            previewSegmentControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            // 原始页面缩略图条（在原始预览下方）
+            originalThumbnailsScrollView.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 8),
+            originalThumbnailsScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            originalThumbnailsScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            originalThumbnailsScrollView.heightAnchor.constraint(equalToConstant: 70),
             
-            infoLabel.topAnchor.constraint(equalTo: previewSegmentControl.bottomAnchor, constant: 8),
+            originalThumbnailsStackView.topAnchor.constraint(equalTo: originalThumbnailsScrollView.topAnchor),
+            originalThumbnailsStackView.leadingAnchor.constraint(equalTo: originalThumbnailsScrollView.leadingAnchor),
+            originalThumbnailsStackView.trailingAnchor.constraint(equalTo: originalThumbnailsScrollView.trailingAnchor),
+            originalThumbnailsStackView.bottomAnchor.constraint(equalTo: originalThumbnailsScrollView.bottomAnchor),
+            originalThumbnailsStackView.heightAnchor.constraint(equalTo: originalThumbnailsScrollView.heightAnchor),
+            
+            // 信息区
+            infoLabel.topAnchor.constraint(equalTo: originalThumbnailsScrollView.bottomAnchor, constant: 8),
             infoLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             infoLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
@@ -310,6 +349,7 @@ class PreviewViewController: UIViewController {
                 if self.documentType == .image {
                     let (image, orientation) = try DocumentProcessor.shared.importImage(from: self.fileURL)
                     self.originalImage = image
+                    self.originalPageThumbnails = [image]
                     self.documentOrientation = orientation
                     self.splitImages = try DocumentProcessor.shared.splitA3ToA4(image: image, orientation: orientation)
                 } else {
@@ -326,28 +366,37 @@ class PreviewViewController: UIViewController {
                         self.splitImages = try DocumentProcessor.shared.splitA3ToA4(pdfDocument: pdf, orientation: orientation)
                     }
                     
-                    // 生成第一页预览图
-                    if let firstPage = pdf.page(at: 0) {
-                        let bounds = firstPage.bounds(for: .mediaBox)
-                        let renderer = UIGraphicsImageRenderer(size: CGSize(width: bounds.width, height: bounds.height))
-                        self.originalImage = renderer.image { context in
+                    // 生成所有原始页面缩略图
+                    self.originalPageThumbnails = []
+                    for pageIndex in 0..<pdf.pageCount {
+                        guard let page = pdf.page(at: pageIndex) else { continue }
+                        let bounds = page.bounds(for: .mediaBox)
+                        let thumbScale: CGFloat = 0.3
+                        let thumbSize = CGSize(width: bounds.width * thumbScale, height: bounds.height * thumbScale)
+                        let renderer = UIGraphicsImageRenderer(size: thumbSize)
+                        let thumbImage = renderer.image { context in
                             UIColor.white.set()
                             context.fill(context.format.bounds)
                             context.cgContext.saveGState()
-                            context.cgContext.translateBy(x: 0, y: bounds.height)
-                            context.cgContext.scaleBy(x: 1, y: -1)
-                            firstPage.draw(with: .mediaBox, to: context.cgContext)
+                            context.cgContext.translateBy(x: 0, y: thumbSize.height)
+                            context.cgContext.scaleBy(x: thumbScale, y: -thumbScale)
+                            page.draw(with: .mediaBox, to: context.cgContext)
                             context.cgContext.restoreGState()
                         }
+                        self.originalPageThumbnails.append(thumbImage)
                     }
+                    
+                    // 第一页作为主预览图
+                    self.originalImage = self.originalPageThumbnails.first
                 }
                 
-                print("[PreviewViewController] 加载完成，splitImages数量: \(self.splitImages.count)")
+                print("[PreviewViewController] 加载完成，splitImages数量: \(self.splitImages.count)，原始缩略图数量: \(self.originalPageThumbnails.count)")
                 
                 DispatchQueue.main.async { [weak self] in
                     self?.activityIndicator.stopAnimating()
                     self?.updateUI()
                     self?.updatePreviewImages()
+                    self?.updateOriginalThumbnails()
                 }
             } catch {
                 print("[PreviewViewController] 加载文档失败: \(error.localizedDescription)")
@@ -430,6 +479,58 @@ class PreviewViewController: UIViewController {
         }
     }
     
+    private func updateOriginalThumbnails() {
+        guard !originalPageThumbnails.isEmpty else { return }
+        
+        // 清空之前的缩略图
+        originalThumbnailsStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        for (index, image) in originalPageThumbnails.enumerated() {
+            let container = UIView()
+            container.translatesAutoresizingMaskIntoConstraints = false
+            
+            let imageView = UIImageView()
+            imageView.contentMode = .scaleAspectFit
+            imageView.backgroundColor = .systemGray6
+            imageView.layer.cornerRadius = 4
+            imageView.clipsToBounds = true
+            imageView.layer.borderWidth = index == 0 ? 2 : 0
+            imageView.layer.borderColor = UIColor.systemBlue.cgColor
+            imageView.image = image
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            
+            let label = UILabel()
+            label.text = "\(index + 1)"
+            label.font = UIFont.systemFont(ofSize: 10, weight: .medium)
+            label.textColor = .white
+            label.textAlignment = .center
+            label.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+            label.layer.cornerRadius = 8
+            label.clipsToBounds = true
+            label.translatesAutoresizingMaskIntoConstraints = false
+            
+            container.addSubview(imageView)
+            container.addSubview(label)
+            
+            NSLayoutConstraint.activate([
+                imageView.topAnchor.constraint(equalTo: container.topAnchor),
+                imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                imageView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+                
+                label.topAnchor.constraint(equalTo: container.topAnchor, constant: 2),
+                label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -2),
+                label.widthAnchor.constraint(equalToConstant: 20),
+                label.heightAnchor.constraint(equalToConstant: 16)
+            ])
+            
+            // 每个缩略图固定宽度
+            container.widthAnchor.constraint(equalToConstant: 80).isActive = true
+            
+            originalThumbnailsStackView.addArrangedSubview(container)
+        }
+    }
+    
     @objc private func updateSplitPreview() {
         guard let original = originalImage else { return }
         
@@ -481,6 +582,7 @@ class PreviewViewController: UIViewController {
         scrollView.isHidden = !isOriginal
         cropOverlayView.isHidden = !isOriginal
         pageIndicatorLabel.isHidden = !isOriginal
+        originalThumbnailsScrollView.isHidden = !isOriginal
         splitPreviewScrollView.isHidden = isOriginal
     }
     
