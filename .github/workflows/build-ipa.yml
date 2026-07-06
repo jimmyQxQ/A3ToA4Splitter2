@@ -35,6 +35,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build/Products
+          xattr -w com.apple.xcode.CreatedByBuildSystem true build/Products
           echo "====== 开始构建 A3ToA4Splitter ======"
 
           xcodebuild \
