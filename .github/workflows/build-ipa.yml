@@ -3,8 +3,8 @@ name: Build iOS IPA
 on:
   push:
     tags:
-      - 'v*'       # 推送 v1.0.0 这样的 tag 时触发构建
-  workflow_dispatch:  # 也支持手动触发
+      - 'v*'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,10 +31,10 @@ jobs:
           xcrun simctl list runtimes
           xcode-select -p
 
-      - name: Build unsigned app
+      - name: Build unsigned archive
         run: |
           mkdir -p build
-          echo "====== 开始构建 A3ToA4Splitter ======"
+          echo "====== 开始归档 A3ToA4Splitter ======"
 
           xcodebuild \
             -project A3ToA4Splitter.xcodeproj \
@@ -42,49 +42,36 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath build/DerivedData \
-            CODE_SIGN_IDENTITY="" \
+            -archivePath build/A3ToA4Splitter.xcarchive \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            clean build \
-            ONLY_ACTIVE_ARCH=NO \
+            clean archive \
             2>&1 | tee build/build.log
 
-          echo "====== 构建完成 ======"
+          echo "====== 归档完成 ======"
 
-      - name: Locate .app bundle
+      - name: Verify archive
         run: |
-          APP_PATH=$(find build/DerivedData -name "A3ToA4Splitter.app" -type d | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            echo "错误: 未找到 .app 文件"
+          ARCHIVE_APP="build/A3ToA4Splitter.xcarchive/Products/Applications/A3ToA4Splitter.app"
+          if [ ! -d "$ARCHIVE_APP" ]; then
+            echo "错误: xcarchive 中未找到 .app"
+            find build -name "*.app" -type d
             exit 1
           fi
-          echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
-          echo "找到 app: $APP_PATH"
-
-      - name: Verify app bundle
-        run: |
-          echo "=== .app 包内容 ==="
-          ls -la "$APP_PATH"
+          echo "找到归档 app: $ARCHIVE_APP"
+          echo "=== .app 内容 ==="
+          ls -la "$ARCHIVE_APP"
           echo ""
-          echo "=== Info.plist CFBundleExecutable ==="
-          plutil -extract CFBundleExecutable raw "$APP_PATH/Info.plist" || cat "$APP_PATH/Info.plist" | grep -A1 "CFBundleExecutable"
-          echo ""
-          echo "=== 可执行文件权限 ==="
-          ls -la "$APP_PATH/A3ToA4Splitter" || echo "错误: 可执行文件不存在!"
-
-      - name: Fix executable permissions
-        run: |
-          chmod +x "$APP_PATH/A3ToA4Splitter"
-          echo "已设置可执行权限"
-          ls -la "$APP_PATH/A3ToA4Splitter"
+          echo "=== 查找可执行文件 ==="
+          find "$ARCHIVE_APP" -maxdepth 1 -type f
 
       - name: Package IPA
         run: |
           mkdir -p build/Payload
-          cp -R "$APP_PATH" build/Payload/
+          cp -R "build/A3ToA4Splitter.xcarchive/Products/Applications/A3ToA4Splitter.app" build/Payload/
           cd build
           zip -r A3ToA4Splitter.ipa Payload
           cd ..
@@ -95,6 +82,9 @@ jobs:
         run: |
           echo "=== IPA 内容 ==="
           unzip -l build/A3ToA4Splitter.ipa | grep -E "A3ToA4Splitter.app/|Payload"
+          echo ""
+          echo "=== 验证可执行文件 ==="
+          unzip -p build/A3ToA4Splitter.ipa "Payload/A3ToA4Splitter.app/A3ToA4Splitter" > /dev/null && echo "可执行文件存在" || echo "可执行文件不存在!"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
