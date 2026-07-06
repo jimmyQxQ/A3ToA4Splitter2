@@ -175,7 +175,7 @@ class PreviewViewController: UIViewController {
     private let fileURL: URL
     private let documentType: DocumentType
     var existingDocument: SplitDocument?
-    private let pdfTotalPages: Int  // 原始PDF的总页数（图片为1）
+    private var pdfTotalPages: Int = 1  // 原始PDF的总页数（图片为1）
     
     private var originalImage: UIImage?
     private var pdfDocument: PDFDocument?
@@ -184,10 +184,9 @@ class PreviewViewController: UIViewController {
     private var splitImages: [UIImage] = []
     
     // MARK: - Initialization
-    init(fileURL: URL, documentType: DocumentType, totalPages: Int = 1) {
+    init(fileURL: URL, documentType: DocumentType) {
         self.fileURL = fileURL
         self.documentType = documentType
-        self.pdfTotalPages = totalPages
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -335,6 +334,8 @@ class PreviewViewController: UIViewController {
                     let (pdf, orientation) = try DocumentProcessor.shared.importPDF(from: self.fileURL)
                     self.pdfDocument = pdf
                     self.documentOrientation = orientation
+                    self.pdfTotalPages = pdf.pageCount
+                    print("[PreviewViewController] PDF页数: \(self.pdfTotalPages)")
                     
                     // 分割所有页面
                     if self.pdfTotalPages > 1 {

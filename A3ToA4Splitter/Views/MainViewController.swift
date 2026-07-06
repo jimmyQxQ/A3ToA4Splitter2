@@ -2,7 +2,6 @@ import UIKit
 import PhotosUI
 import MobileCoreServices
 import UniformTypeIdentifiers
-import PDFKit
 
 class MainViewController: UIViewController {
     
@@ -445,17 +444,10 @@ class MainViewController: UIViewController {
                 }
                 print("[MainViewController] 文件类型: \(docType == .image ? "图片" : "PDF")")
                 
-                // 3. 获取PDF页数信息
-                var pageCount = 1
-                if docType == .pdf, let pdfDoc = PDFDocument(url: savedURL) {
-                    pageCount = pdfDoc.pageCount
-                    print("[MainViewController] PDF页数: \(pageCount)")
-                }
-                
                 DispatchQueue.main.async {
                     self?.activityIndicator.stopAnimating()
                     
-                    let previewVC = PreviewViewController(fileURL: savedURL, documentType: docType, totalPages: pageCount)
+                    let previewVC = PreviewViewController(fileURL: savedURL, documentType: docType)
                     self?.navigationController?.pushViewController(previewVC, animated: true)
                 }
             } catch {
