@@ -106,7 +106,7 @@ class MainViewController: UIViewController {
     private let recentFilesStackView: UIStackView = {
         let sv = UIStackView()
         sv.axis = .vertical
-        sv.spacing = 8
+        sv.spacing = 10
         sv.translatesAutoresizingMaskIntoConstraints = false
         return sv
     }()
@@ -128,14 +128,13 @@ class MainViewController: UIViewController {
         return label
     }()
     
-    private let guideStepsLabel: UILabel = {
-        let label = UILabel()
-        label.text = "1. 点击导入文档按钮\n2. 选择 A3 尺寸的图片或 PDF\n3. 预览原始文档与分割效果\n4. 保存或分享分割后的 A4 文件"
-        label.font = UIFont.systemFont(ofSize: 13)
-        label.textColor = .secondaryLabel
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
+    // 步骤圆圈图标容器
+    private let guideStepsStackView: UIStackView = {
+        let sv = UIStackView()
+        sv.axis = .vertical
+        sv.spacing = 12
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
     }()
     
     private let activityIndicator: UIActivityIndicatorView = {
@@ -154,6 +153,7 @@ class MainViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         setupActions()
+        setupGuideSteps()
         loadRecentDocuments()
     }
     
@@ -184,7 +184,7 @@ class MainViewController: UIViewController {
         
         contentView.addSubview(guideView)
         guideView.addSubview(guideTitle)
-        guideView.addSubview(guideStepsLabel)
+        guideView.addSubview(guideStepsStackView)
         
         view.addSubview(activityIndicator)
         
@@ -204,17 +204,17 @@ class MainViewController: UIViewController {
             headerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             headerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             
-            headerTitle.topAnchor.constraint(equalTo: headerView.topAnchor, constant: 20),
+            headerTitle.topAnchor.constraint(equalTo: headerView.topAnchor, constant: 28),
             headerTitle.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 20),
             
-            headerSubtitle.topAnchor.constraint(equalTo: headerTitle.bottomAnchor, constant: 4),
+            headerSubtitle.topAnchor.constraint(equalTo: headerTitle.bottomAnchor, constant: 6),
             headerSubtitle.leadingAnchor.constraint(equalTo: headerTitle.leadingAnchor),
             
-            importButton.topAnchor.constraint(equalTo: headerSubtitle.bottomAnchor, constant: 16),
+            importButton.topAnchor.constraint(equalTo: headerSubtitle.bottomAnchor, constant: 20),
             importButton.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 20),
             importButton.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -20),
-            importButton.heightAnchor.constraint(equalToConstant: 42),
-            importButton.bottomAnchor.constraint(equalTo: headerView.bottomAnchor, constant: -20),
+            importButton.heightAnchor.constraint(equalToConstant: 44),
+            importButton.bottomAnchor.constraint(equalTo: headerView.bottomAnchor, constant: -28),
             
             recentFilesLabel.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 20),
             recentFilesLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
@@ -248,10 +248,10 @@ class MainViewController: UIViewController {
             guideTitle.leadingAnchor.constraint(equalTo: guideView.leadingAnchor, constant: 16),
             guideTitle.trailingAnchor.constraint(equalTo: guideView.trailingAnchor, constant: -16),
             
-            guideStepsLabel.topAnchor.constraint(equalTo: guideTitle.bottomAnchor, constant: 8),
-            guideStepsLabel.leadingAnchor.constraint(equalTo: guideView.leadingAnchor, constant: 16),
-            guideStepsLabel.trailingAnchor.constraint(equalTo: guideView.trailingAnchor, constant: -16),
-            guideStepsLabel.bottomAnchor.constraint(equalTo: guideView.bottomAnchor, constant: -16),
+            guideStepsStackView.topAnchor.constraint(equalTo: guideTitle.bottomAnchor, constant: 12),
+            guideStepsStackView.leadingAnchor.constraint(equalTo: guideView.leadingAnchor, constant: 16),
+            guideStepsStackView.trailingAnchor.constraint(equalTo: guideView.trailingAnchor, constant: -16),
+            guideStepsStackView.bottomAnchor.constraint(equalTo: guideView.bottomAnchor, constant: -16),
             
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
@@ -261,6 +261,67 @@ class MainViewController: UIViewController {
     private func setupActions() {
         importButton.addTarget(self, action: #selector(importButtonTapped), for: .touchUpInside)
         viewAllButton.addTarget(self, action: #selector(viewAllButtonTapped), for: .touchUpInside)
+    }
+    
+    // MARK: - Guide Steps with Circle Icons
+    private func setupGuideSteps() {
+        let steps = [
+            ("doc.badge.plus", "点击导入文档按钮"),
+            ("photo.on.rectangle.angled", "选择 A3 尺寸的图片或 PDF"),
+            ("doc.text.magnifyingglass", "预览原始文档与分割效果"),
+            ("square.and.arrow.down", "保存或分享分割后的 A4 文件")
+        ]
+        
+        for (index, (iconName, text)) in steps.enumerated() {
+            let row = UIView()
+            row.translatesAutoresizingMaskIntoConstraints = false
+            
+            let circleLabel = UILabel()
+            circleLabel.text = "\(index + 1)"
+            circleLabel.font = UIFont.systemFont(ofSize: 13, weight: .bold)
+            circleLabel.textColor = .white
+            circleLabel.textAlignment = .center
+            circleLabel.backgroundColor = .systemBlue
+            circleLabel.layer.cornerRadius = 12
+            circleLabel.clipsToBounds = true
+            circleLabel.translatesAutoresizingMaskIntoConstraints = false
+            
+            let stepIcon = UIImageView()
+            stepIcon.image = UIImage(systemName: iconName)
+            stepIcon.tintColor = .systemBlue
+            stepIcon.contentMode = .scaleAspectFit
+            stepIcon.translatesAutoresizingMaskIntoConstraints = false
+            
+            let stepLabel = UILabel()
+            stepLabel.text = text
+            stepLabel.font = UIFont.systemFont(ofSize: 14)
+            stepLabel.textColor = .label
+            stepLabel.translatesAutoresizingMaskIntoConstraints = false
+            
+            row.addSubview(circleLabel)
+            row.addSubview(stepIcon)
+            row.addSubview(stepLabel)
+            
+            NSLayoutConstraint.activate([
+                row.heightAnchor.constraint(equalToConstant: 28),
+                
+                circleLabel.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+                circleLabel.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+                circleLabel.widthAnchor.constraint(equalToConstant: 24),
+                circleLabel.heightAnchor.constraint(equalToConstant: 24),
+                
+                stepIcon.leadingAnchor.constraint(equalTo: circleLabel.trailingAnchor, constant: 10),
+                stepIcon.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+                stepIcon.widthAnchor.constraint(equalToConstant: 20),
+                stepIcon.heightAnchor.constraint(equalToConstant: 20),
+                
+                stepLabel.leadingAnchor.constraint(equalTo: stepIcon.trailingAnchor, constant: 8),
+                stepLabel.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+                stepLabel.trailingAnchor.constraint(equalTo: row.trailingAnchor)
+            ])
+            
+            guideStepsStackView.addArrangedSubview(row)
+        }
     }
     
     // MARK: - Data Loading
@@ -339,15 +400,15 @@ class MainViewController: UIViewController {
         container.addSubview(arrowImageView)
         
         NSLayoutConstraint.activate([
-            container.heightAnchor.constraint(equalToConstant: 64),
+            container.heightAnchor.constraint(equalToConstant: 72),
             
             thumbnailImageView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
             thumbnailImageView.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            thumbnailImageView.widthAnchor.constraint(equalToConstant: 44),
-            thumbnailImageView.heightAnchor.constraint(equalToConstant: 44),
+            thumbnailImageView.widthAnchor.constraint(equalToConstant: 48),
+            thumbnailImageView.heightAnchor.constraint(equalToConstant: 48),
             
             nameLabel.leadingAnchor.constraint(equalTo: thumbnailImageView.trailingAnchor, constant: 12),
-            nameLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 10),
+            nameLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
             nameLabel.trailingAnchor.constraint(equalTo: arrowImageView.leadingAnchor, constant: -8),
             
             dateLabel.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),

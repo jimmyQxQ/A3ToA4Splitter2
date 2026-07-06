@@ -79,6 +79,34 @@ class PreviewViewController: UIViewController {
         return label
     }()
     
+    // 文件详情面板
+    private let detailPanelView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .secondarySystemBackground
+        view.layer.cornerRadius = 10
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let fileNameLabel: UILabel = {
+        let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        label.textColor = .label
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let fileSizeLabel: UILabel = {
+        let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 13)
+        label.textColor = .secondaryLabel
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
     private let actionStackView: UIStackView = {
         let sv = UIStackView()
         sv.axis = .horizontal
@@ -130,6 +158,7 @@ class PreviewViewController: UIViewController {
     private var pdfDocument: PDFDocument?
     private var documentOrientation: DocumentOrientation = .landscape
     private var splitImages: [UIImage] = []
+    private var displayImageSize: CGSize = .zero
     
     // MARK: - Initialization
     init(fileURL: URL, documentType: DocumentType) {
@@ -166,6 +195,9 @@ class PreviewViewController: UIViewController {
         
         view.addSubview(infoLabel)
         view.addSubview(outputInfoLabel)
+        view.addSubview(detailPanelView)
+        detailPanelView.addSubview(fileNameLabel)
+        detailPanelView.addSubview(fileSizeLabel)
         view.addSubview(actionStackView)
         actionStackView.addArrangedSubview(saveButton)
         actionStackView.addArrangedSubview(shareButton)
@@ -179,7 +211,7 @@ class PreviewViewController: UIViewController {
             scrollView.topAnchor.constraint(equalTo: previewSegmentControl.bottomAnchor, constant: 12),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            scrollView.heightAnchor.constraint(equalToConstant: 300),
+            scrollView.heightAnchor.constraint(equalToConstant: 350),
             
             originalPreviewStackView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             originalPreviewStackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
@@ -195,7 +227,7 @@ class PreviewViewController: UIViewController {
             splitPreviewScrollView.topAnchor.constraint(equalTo: previewSegmentControl.bottomAnchor, constant: 12),
             splitPreviewScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             splitPreviewScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            splitPreviewScrollView.heightAnchor.constraint(equalToConstant: 300),
+            splitPreviewScrollView.heightAnchor.constraint(equalToConstant: 350),
             
             splitPreviewStackView.topAnchor.constraint(equalTo: splitPreviewScrollView.topAnchor),
             splitPreviewStackView.leadingAnchor.constraint(equalTo: splitPreviewScrollView.leadingAnchor),
@@ -211,7 +243,20 @@ class PreviewViewController: UIViewController {
             outputInfoLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             outputInfoLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
-            actionStackView.topAnchor.constraint(equalTo: outputInfoLabel.bottomAnchor, constant: 20),
+            detailPanelView.topAnchor.constraint(equalTo: outputInfoLabel.bottomAnchor, constant: 12),
+            detailPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            detailPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            
+            fileNameLabel.topAnchor.constraint(equalTo: detailPanelView.topAnchor, constant: 12),
+            fileNameLabel.leadingAnchor.constraint(equalTo: detailPanelView.leadingAnchor, constant: 16),
+            fileNameLabel.trailingAnchor.constraint(equalTo: detailPanelView.trailingAnchor, constant: -16),
+            
+            fileSizeLabel.topAnchor.constraint(equalTo: fileNameLabel.bottomAnchor, constant: 4),
+            fileSizeLabel.leadingAnchor.constraint(equalTo: detailPanelView.leadingAnchor, constant: 16),
+            fileSizeLabel.trailingAnchor.constraint(equalTo: detailPanelView.trailingAnchor, constant: -16),
+            fileSizeLabel.bottomAnchor.constraint(equalTo: detailPanelView.bottomAnchor, constant: -12),
+            
+            actionStackView.topAnchor.constraint(equalTo: detailPanelView.bottomAnchor, constant: 20),
             actionStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             actionStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             actionStackView.heightAnchor.constraint(equalToConstant: 48),
@@ -242,12 +287,19 @@ class PreviewViewController: UIViewController {
                     let (image, orientation) = try DocumentProcessor.shared.importImage(from: self.fileURL)
                     self.documentOrientation = orientation
                     self.originalPageThumbnails = [image]
+                    self.displayImageSize = image.size
                     self.splitImages = try DocumentProcessor.shared.splitA3ToA4(image: image, orientation: orientation)
                 } else {
                     let (pdf, orientation) = try DocumentProcessor.shared.importPDF(from: self.fileURL)
                     self.pdfDocument = pdf
                     self.documentOrientation = orientation
                     self.pdfTotalPages = pdf.pageCount
+                    
+                    // 获取第一页的尺寸作为显示尺寸
+                    if let firstPage = pdf.page(at: 0) {
+                        let bounds = firstPage.bounds(for: .mediaBox)
+                        self.displayImageSize = CGSize(width: bounds.width, height: bounds.height)
+                    }
                     
                     if self.pdfTotalPages > 1 {
                         self.splitImages = try DocumentProcessor.shared.splitAllPages(pdfDocument: pdf, orientation: orientation)
@@ -302,6 +354,22 @@ class PreviewViewController: UIViewController {
             outputInfoLabel.text = "将输出 2 页 A4 PDF"
             pageIndicatorLabel.text = "  共 1 页 A3  "
         }
+        
+        // 文件详情面板
+        fileNameLabel.text = fileURL.lastPathComponent
+        let sizeText = displayImageSize.width > 0
+            ? String(format: "%.0f x %.0f 像素", displayImageSize.width, displayImageSize.height)
+            : "未知"
+        
+        // 计算文件大小
+        let fileSize: Int64 = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int64) ?? 0
+        let fileSizeFormatted: String
+        if fileSize > 1024 * 1024 {
+            fileSizeFormatted = String(format: "%.1f MB", Double(fileSize) / 1024.0 / 1024.0)
+        } else {
+            fileSizeFormatted = String(format: "%.0f KB", Double(fileSize) / 1024.0)
+        }
+        fileSizeLabel.text = "尺寸: \(sizeText)  |  大小: \(fileSizeFormatted)"
     }
     
     private func updateOriginalPreview() {
@@ -311,6 +379,13 @@ class PreviewViewController: UIViewController {
         
         for (index, image) in originalPageThumbnails.enumerated() {
             let container = createPreviewCard(image: image, labelText: "A3-\(index + 1)", borderColor: .systemGray4)
+            if let imageView = container.subviews.first as? UIImageView {
+                let tap = UITapGestureRecognizer(target: self, action: #selector(previewImageTapped(_:)))
+                tap.numberOfTapsRequired = 1
+                imageView.addGestureRecognizer(tap)
+                imageView.tag = index
+                imageView.accessibilityLabel = "A3-\(index + 1)"
+            }
             originalPreviewStackView.addArrangedSubview(container)
         }
     }
@@ -322,8 +397,34 @@ class PreviewViewController: UIViewController {
         
         for (index, image) in splitImages.enumerated() {
             let container = createPreviewCard(image: image, labelText: "A4-\(index + 1)", borderColor: .systemBlue)
+            if let imageView = container.subviews.first as? UIImageView {
+                let tap = UITapGestureRecognizer(target: self, action: #selector(previewSplitTapped(_:)))
+                tap.numberOfTapsRequired = 1
+                imageView.addGestureRecognizer(tap)
+                imageView.tag = index + 1000 // 用1000偏移区分原始和分割
+                imageView.accessibilityLabel = "A4-\(index + 1)"
+            }
             splitPreviewStackView.addArrangedSubview(container)
         }
+    }
+    
+    @objc private func previewImageTapped(_ gesture: UITapGestureRecognizer) {
+        guard let index = gesture.view?.tag, index < originalPageThumbnails.count else { return }
+        presentFullScreen(image: originalPageThumbnails[index])
+    }
+    
+    @objc private func previewSplitTapped(_ gesture: UITapGestureRecognizer) {
+        let index = gesture.view?.tag ?? 0
+        let actualIndex = index - 1000
+        guard actualIndex >= 0, actualIndex < splitImages.count else { return }
+        presentFullScreen(image: splitImages[actualIndex])
+    }
+    
+    private func presentFullScreen(image: UIImage) {
+        let fullScreenVC = FullScreenImageViewController(image: image)
+        fullScreenVC.modalPresentationStyle = .fullScreen
+        fullScreenVC.modalTransitionStyle = .crossDissolve
+        present(fullScreenVC, animated: true)
     }
     
     private func createPreviewCard(image: UIImage, labelText: String, borderColor: UIColor) -> UIView {
@@ -338,6 +439,7 @@ class PreviewViewController: UIViewController {
         imageView.layer.borderWidth = 1
         imageView.layer.borderColor = borderColor.cgColor
         imageView.image = image
+        imageView.isUserInteractionEnabled = true
         imageView.translatesAutoresizingMaskIntoConstraints = false
         
         let label = UILabel()
@@ -354,7 +456,7 @@ class PreviewViewController: UIViewController {
             imageView.topAnchor.constraint(equalTo: container.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            imageView.heightAnchor.constraint(equalToConstant: 180),
+            imageView.heightAnchor.constraint(equalToConstant: 280),
             
             label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
             label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
@@ -555,5 +657,86 @@ extension PreviewViewController: UIDocumentPickerDelegate {
     }
     
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    }
+}
+
+// MARK: - 全屏图片预览
+class FullScreenImageViewController: UIViewController {
+    
+    private let scrollView: UIScrollView = {
+        let sv = UIScrollView()
+        sv.minimumZoomScale = 1.0
+        sv.maximumZoomScale = 4.0
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
+    }()
+    
+    private let imageView: UIImageView = {
+        let iv = UIImageView()
+        iv.contentMode = .scaleAspectFit
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+    
+    private let closeButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        button.tintColor = .white
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
+    init(image: UIImage) {
+        super.init(nibName: nil, bundle: nil)
+        imageView.image = image
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        
+        view.addSubview(scrollView)
+        scrollView.addSubview(imageView)
+        view.addSubview(closeButton)
+        
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            imageView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            imageView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            imageView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
+            
+            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            closeButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            closeButton.widthAnchor.constraint(equalToConstant: 40),
+            closeButton.heightAnchor.constraint(equalToConstant: 40)
+        ])
+        
+        scrollView.delegate = self
+        closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+        
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(closeTapped))
+        doubleTap.numberOfTapsRequired = 2
+        view.addGestureRecognizer(doubleTap)
+    }
+    
+    @objc private func closeTapped() {
+        dismiss(animated: true)
+    }
+}
+
+extension FullScreenImageViewController: UIScrollViewDelegate {
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        return imageView
     }
 }
