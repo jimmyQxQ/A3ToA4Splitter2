@@ -43,6 +43,7 @@ jobs:
             -sdk ${{ env.SDK }} \
             -destination 'generic/platform=iOS' \
             CONFIGURATION_BUILD_DIR="$(pwd)/build" \
+            ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
