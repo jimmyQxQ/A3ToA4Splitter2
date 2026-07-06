@@ -4,7 +4,6 @@ import PDFKit
 class PreviewViewController: UIViewController {
     
     // MARK: - UI Components
-    // 原始预览：水平滚动显示所有A3页面
     private let scrollView: UIScrollView = {
         let sv = UIScrollView()
         sv.translatesAutoresizingMaskIntoConstraints = false
@@ -41,12 +40,12 @@ class PreviewViewController: UIViewController {
         return sc
     }()
     
-    // 分割预览：水平滚动显示所有页面
     private let splitPreviewScrollView: UIScrollView = {
         let sv = UIScrollView()
         sv.translatesAutoresizingMaskIntoConstraints = false
         sv.showsHorizontalScrollIndicator = true
         sv.isHidden = true
+        sv.alpha = 0
         return sv
     }()
     
@@ -91,7 +90,7 @@ class PreviewViewController: UIViewController {
     
     private let saveButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("保存PDF", for: .normal)
+        button.setTitle("保存 PDF", for: .normal)
         button.setImage(UIImage(systemName: "square.and.arrow.down"), for: .normal)
         button.tintColor = .white
         button.backgroundColor = .systemBlue
@@ -103,11 +102,12 @@ class PreviewViewController: UIViewController {
     
     private let shareButton: UIButton = {
         let button = UIButton(type: .system)
-        let shareImage = UIImage(systemName: "square.and.arrow.up")
-        button.setImage(shareImage, for: .normal)
+        button.setTitle("分享", for: .normal)
+        button.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
         button.tintColor = .systemBlue
         button.backgroundColor = .systemBlue.withAlphaComponent(0.1)
         button.layer.cornerRadius = 10
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -172,15 +172,14 @@ class PreviewViewController: UIViewController {
         view.addSubview(activityIndicator)
         
         NSLayoutConstraint.activate([
-            // segmentControl 在顶部
-            previewSegmentControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            previewSegmentControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
             previewSegmentControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            previewSegmentControl.widthAnchor.constraint(equalToConstant: 200),
             
-            // 原始预览：水平滚动显示所有A3页面
             scrollView.topAnchor.constraint(equalTo: previewSegmentControl.bottomAnchor, constant: 12),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            scrollView.heightAnchor.constraint(equalToConstant: 220),
+            scrollView.heightAnchor.constraint(equalToConstant: 300),
             
             originalPreviewStackView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             originalPreviewStackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
@@ -193,11 +192,10 @@ class PreviewViewController: UIViewController {
             pageIndicatorLabel.heightAnchor.constraint(equalToConstant: 24),
             pageIndicatorLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
             
-            // 分割预览与原始预览同一位置
             splitPreviewScrollView.topAnchor.constraint(equalTo: previewSegmentControl.bottomAnchor, constant: 12),
             splitPreviewScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             splitPreviewScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            splitPreviewScrollView.heightAnchor.constraint(equalToConstant: 220),
+            splitPreviewScrollView.heightAnchor.constraint(equalToConstant: 300),
             
             splitPreviewStackView.topAnchor.constraint(equalTo: splitPreviewScrollView.topAnchor),
             splitPreviewStackView.leadingAnchor.constraint(equalTo: splitPreviewScrollView.leadingAnchor),
@@ -205,23 +203,21 @@ class PreviewViewController: UIViewController {
             splitPreviewStackView.bottomAnchor.constraint(equalTo: splitPreviewScrollView.bottomAnchor),
             splitPreviewStackView.heightAnchor.constraint(equalTo: splitPreviewScrollView.heightAnchor),
             
-            // 信息区
-            infoLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 16),
+            infoLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
             infoLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             infoLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
-            outputInfoLabel.topAnchor.constraint(equalTo: infoLabel.bottomAnchor, constant: 6),
+            outputInfoLabel.topAnchor.constraint(equalTo: infoLabel.bottomAnchor, constant: 4),
             outputInfoLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             outputInfoLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             
-            actionStackView.topAnchor.constraint(equalTo: outputInfoLabel.bottomAnchor, constant: 24),
+            actionStackView.topAnchor.constraint(equalTo: outputInfoLabel.bottomAnchor, constant: 20),
             actionStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             actionStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             actionStackView.heightAnchor.constraint(equalToConstant: 48),
             
             saveButton.heightAnchor.constraint(equalToConstant: 48),
             shareButton.heightAnchor.constraint(equalToConstant: 48),
-            shareButton.widthAnchor.constraint(equalToConstant: 60),
             
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
@@ -252,16 +248,13 @@ class PreviewViewController: UIViewController {
                     self.pdfDocument = pdf
                     self.documentOrientation = orientation
                     self.pdfTotalPages = pdf.pageCount
-                    print("[PreviewViewController] PDF页数: \(self.pdfTotalPages)")
                     
-                    // 分割所有页面
                     if self.pdfTotalPages > 1 {
                         self.splitImages = try DocumentProcessor.shared.splitAllPages(pdfDocument: pdf, orientation: orientation)
                     } else {
                         self.splitImages = try DocumentProcessor.shared.splitA3ToA4(pdfDocument: pdf, orientation: orientation)
                     }
                     
-                    // 生成所有原始页面缩略图
                     self.originalPageThumbnails = []
                     for pageIndex in 0..<pdf.pageCount {
                         guard let page = pdf.page(at: pageIndex) else { continue }
@@ -282,8 +275,6 @@ class PreviewViewController: UIViewController {
                     }
                 }
                 
-                print("[PreviewViewController] 加载完成，splitImages数量: \(self.splitImages.count)，原始缩略图数量: \(self.originalPageThumbnails.count)")
-                
                 DispatchQueue.main.async { [weak self] in
                     self?.activityIndicator.stopAnimating()
                     self?.updateUI()
@@ -291,7 +282,6 @@ class PreviewViewController: UIViewController {
                     self?.updatePreviewImages()
                 }
             } catch {
-                print("[PreviewViewController] 加载文档失败: \(error.localizedDescription)")
                 DispatchQueue.main.async { [weak self] in
                     self?.activityIndicator.stopAnimating()
                     self?.showError(error)
@@ -303,16 +293,13 @@ class PreviewViewController: UIViewController {
     private func updateUI() {
         guard !originalPageThumbnails.isEmpty else { return }
         
-        let size = originalPageThumbnails[0].size
-        infoLabel.text = String(format: "原始尺寸: %.0f x %.0f 像素 | 方向: %@ | 共 %d 页",
-                                size.width, size.height,
-                                documentOrientation == .landscape ? "横向A3" : "纵向A3",
-                                originalPageThumbnails.count)
+        let orientationText = documentOrientation == .landscape ? "横向" : "纵向"
+        infoLabel.text = "\(originalPageThumbnails.count) 页 \(orientationText) A3 文档"
         if pdfTotalPages > 1 {
-            outputInfoLabel.text = "将输出 1 份 \(pdfTotalPages * 2) 页 A4 PDF（\(pdfTotalPages) 页 A3 → 每页分割为 2 页 A4）"
+            outputInfoLabel.text = "将输出 \(pdfTotalPages * 2) 页 A4 PDF"
             pageIndicatorLabel.text = "  共 \(pdfTotalPages) 页 A3  "
         } else {
-            outputInfoLabel.text = "将输出 1 份 2 页 A4 PDF"
+            outputInfoLabel.text = "将输出 2 页 A4 PDF"
             pageIndicatorLabel.text = "  共 1 页 A3  "
         }
     }
@@ -320,47 +307,10 @@ class PreviewViewController: UIViewController {
     private func updateOriginalPreview() {
         guard !originalPageThumbnails.isEmpty else { return }
         
-        // 清空之前的原始预览
         originalPreviewStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
         for (index, image) in originalPageThumbnails.enumerated() {
-            let container = UIView()
-            container.translatesAutoresizingMaskIntoConstraints = false
-            
-            let imageView = UIImageView()
-            imageView.contentMode = .scaleAspectFit
-            imageView.backgroundColor = .systemGray6
-            imageView.layer.cornerRadius = 8
-            imageView.clipsToBounds = true
-            imageView.layer.borderWidth = 1
-            imageView.layer.borderColor = UIColor.systemGray4.cgColor
-            imageView.image = image
-            imageView.translatesAutoresizingMaskIntoConstraints = false
-            
-            let label = UILabel()
-            label.text = "A3-\(index + 1)"
-            label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-            label.textColor = .secondaryLabel
-            label.textAlignment = .center
-            label.translatesAutoresizingMaskIntoConstraints = false
-            
-            container.addSubview(imageView)
-            container.addSubview(label)
-            
-            NSLayoutConstraint.activate([
-                imageView.topAnchor.constraint(equalTo: container.topAnchor),
-                imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                imageView.heightAnchor.constraint(equalToConstant: 200),
-                
-                label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
-                label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-                label.bottomAnchor.constraint(equalTo: container.bottomAnchor)
-            ])
-            
-            // 每个预览容器固定宽度
-            container.widthAnchor.constraint(equalToConstant: 150).isActive = true
-            
+            let container = createPreviewCard(image: image, labelText: "A3-\(index + 1)", borderColor: .systemGray4)
             originalPreviewStackView.addArrangedSubview(container)
         }
     }
@@ -368,62 +318,69 @@ class PreviewViewController: UIViewController {
     private func updatePreviewImages() {
         guard !splitImages.isEmpty else { return }
         
-        // 清空之前的分割预览
         splitPreviewStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
         for (index, image) in splitImages.enumerated() {
-            let container = UIView()
-            container.translatesAutoresizingMaskIntoConstraints = false
-            
-            let imageView = UIImageView()
-            imageView.contentMode = .scaleAspectFit
-            imageView.backgroundColor = .systemGray6
-            imageView.layer.cornerRadius = 8
-            imageView.clipsToBounds = true
-            imageView.layer.borderWidth = 1
-            imageView.layer.borderColor = UIColor.systemBlue.cgColor
-            imageView.image = image
-            imageView.translatesAutoresizingMaskIntoConstraints = false
-            
-            let label = UILabel()
-            label.text = "A4-\(index + 1)"
-            label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-            label.textColor = .systemBlue
-            label.textAlignment = .center
-            label.translatesAutoresizingMaskIntoConstraints = false
-            
-            container.addSubview(imageView)
-            container.addSubview(label)
-            
-            NSLayoutConstraint.activate([
-                imageView.topAnchor.constraint(equalTo: container.topAnchor),
-                imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                imageView.heightAnchor.constraint(equalToConstant: 200),
-                
-                label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
-                label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-                label.bottomAnchor.constraint(equalTo: container.bottomAnchor)
-            ])
-            
-            // 每个预览容器固定宽度
-            container.widthAnchor.constraint(equalToConstant: 150).isActive = true
-            
+            let container = createPreviewCard(image: image, labelText: "A4-\(index + 1)", borderColor: .systemBlue)
             splitPreviewStackView.addArrangedSubview(container)
         }
+    }
+    
+    private func createPreviewCard(image: UIImage, labelText: String, borderColor: UIColor) -> UIView {
+        let container = UIView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFit
+        imageView.backgroundColor = .systemGray6
+        imageView.layer.cornerRadius = 8
+        imageView.clipsToBounds = true
+        imageView.layer.borderWidth = 1
+        imageView.layer.borderColor = borderColor.cgColor
+        imageView.image = image
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let label = UILabel()
+        label.text = labelText
+        label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+        label.textColor = borderColor
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        container.addSubview(imageView)
+        container.addSubview(label)
+        
+        NSLayoutConstraint.activate([
+            imageView.topAnchor.constraint(equalTo: container.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            imageView.heightAnchor.constraint(equalToConstant: 180),
+            
+            label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
+            label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+        
+        container.widthAnchor.constraint(equalToConstant: 150).isActive = true
+        return container
     }
     
     // MARK: - Actions
     @objc private func segmentChanged() {
         let isOriginal = previewSegmentControl.selectedSegmentIndex == 0
         
-        scrollView.isHidden = !isOriginal
-        pageIndicatorLabel.isHidden = !isOriginal
-        splitPreviewScrollView.isHidden = isOriginal
+        UIView.animate(withDuration: 0.25) {
+            self.scrollView.alpha = isOriginal ? 1 : 0
+            self.scrollView.isHidden = !isOriginal
+            self.pageIndicatorLabel.alpha = isOriginal ? 1 : 0
+            self.pageIndicatorLabel.isHidden = !isOriginal
+            
+            self.splitPreviewScrollView.alpha = isOriginal ? 0 : 1
+            self.splitPreviewScrollView.isHidden = isOriginal
+        }
     }
     
     @objc private func savePDF() {
-        print("[PreviewViewController] 点击保存PDF，splitImages数量: \(splitImages.count)")
         guard !splitImages.isEmpty else {
             showError(AppError.invalidCropArea)
             return
@@ -435,14 +392,10 @@ class PreviewViewController: UIViewController {
             do {
                 guard let self = self else { return }
                 
-                print("[PreviewViewController] 开始生成PDF，共 \(self.splitImages.count) 张图片")
                 let pdfData = try PDFGenerator.shared.generatePDF(from: self.splitImages)
-                print("[PreviewViewController] PDF生成成功，数据大小: \(pdfData.count) bytes")
                 
-                // 验证PDF页数
                 let verifyDoc = PDFDocument(data: pdfData)
                 let pageCount = verifyDoc?.pageCount ?? 0
-                print("[PreviewViewController] PDF验证页数: \(pageCount)")
                 
                 let expectedPages = self.splitImages.count
                 guard pageCount == expectedPages else {
@@ -454,8 +407,6 @@ class PreviewViewController: UIViewController {
                 }
                 
                 let fileName = "\(self.fileURL.deletingPathExtension().lastPathComponent)_split.pdf"
-                
-                // 保存到临时目录，然后让用户选择保存位置
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
                 try pdfData.write(to: tempURL)
                 
@@ -472,29 +423,21 @@ class PreviewViewController: UIViewController {
         }
     }
     
-    // MARK: - 保存对话框
+    // MARK: - 保存对话框（简化为2个选项）
     private func presentSaveDialog(fileURL: URL, fileName: String) {
-        // 选项1: 保存到本地应用目录（始终可用）
-        let saveLocal = UIAlertAction(title: "保存到应用（推荐）", style: .default) { [weak self] _ in
+        let saveLocal = UIAlertAction(title: "保存到本应用", style: .default) { [weak self] _ in
             self?.saveToLocalApp(fileURL: fileURL, fileName: fileName)
         }
         
-        // 选项2: 通过系统分享保存（可保存到文件/ iCloud）
-        let saveViaSystem = UIAlertAction(title: "另存为...", style: .default) { [weak self] _ in
-            self?.presentDocumentPickerForSave(fileURL: fileURL, fileName: fileName)
-        }
-        
-        // 选项3: 复制到文件 App
-        let copyFiles = UIAlertAction(title: "复制到「文件」App", style: .default) { [weak self] _ in
+        let saveToFiles = UIAlertAction(title: "保存到文件", style: .default) { [weak self] _ in
             self?.saveToFilesApp(fileURL: fileURL, fileName: fileName)
         }
         
         let cancel = UIAlertAction(title: "取消", style: .cancel)
         
-        let alert = UIAlertController(title: "保存 PDF", message: "选择保存方式", preferredStyle: .actionSheet)
+        let alert = UIAlertController(title: "保存 PDF", message: nil, preferredStyle: .actionSheet)
         alert.addAction(saveLocal)
-        alert.addAction(saveViaSystem)
-        alert.addAction(copyFiles)
+        alert.addAction(saveToFiles)
         alert.addAction(cancel)
         
         if let popover = alert.popoverPresentationController {
@@ -509,7 +452,6 @@ class PreviewViewController: UIViewController {
         do {
             let savedURL = try PDFGenerator.shared.savePDF(data: try Data(contentsOf: fileURL), fileName: (fileName as NSString).deletingPathExtension)
             
-            // 记录到文件管理器
             let thumbnail = DocumentProcessor.shared.generateThumbnail(from: splitImages[0])
             let thumbnailData = thumbnail?.pngData()
             
@@ -524,47 +466,14 @@ class PreviewViewController: UIViewController {
             updatedDocument.splitFilePaths = [savedURL.path]
             LocalFileManager.shared.addDocument(updatedDocument)
             
-            let pathAlert = UIAlertController(
-                title: "保存成功",
-                message: "文件已保存到应用内部\n\n路径：SplitDocuments/\(fileName)",
-                preferredStyle: .alert
-            )
-            pathAlert.addAction(UIAlertAction(title: "确定", style: .default))
-            present(pathAlert, animated: true)
+            showSuccess("文件已保存到应用内部")
         } catch {
             showError(error)
         }
     }
     
-    private func presentDocumentPickerForSave(fileURL: URL, fileName: String) {
-        // 使用 UIDocumentPicker 以"导出"模式让用户选择目标位置
-        let tempDir = FileManager.default.temporaryDirectory
-        let exportURL = tempDir.appendingPathComponent(fileName)
-        try? FileManager.default.copyItem(at: fileURL, to: exportURL)
-        
-        // 使用 UIActivityViewController 带 "Save to Files" 让用户选位置
-        let activityVC = UIActivityViewController(
-            activityItems: [exportURL],
-            applicationActivities: nil
-        )
-        activityVC.completionWithItemsHandler = { [weak self] _, completed, _, _ in
-            if completed {
-                self?.showSuccess("已通过系统保存到指定位置")
-            }
-        }
-        
-        if let popover = activityVC.popoverPresentationController {
-            popover.sourceView = shareButton
-            popover.sourceRect = shareButton.bounds
-        }
-        
-        present(activityVC, animated: true)
-    }
-    
     private func saveToFilesApp(fileURL: URL, fileName: String) {
-        // iOS 14+ 的 UIDocumentPicker for export
         if #available(iOS 14.0, *) {
-            // 先确保临时文件存在
             let tempDir = FileManager.default.temporaryDirectory
             let exportURL = tempDir.appendingPathComponent(fileName)
             try? FileManager.default.removeItem(at: exportURL)
@@ -577,7 +486,6 @@ class PreviewViewController: UIViewController {
     }
     
     @objc private func sharePDF() {
-        print("[PreviewViewController] 点击分享PDF，splitImages数量: \(splitImages.count)")
         guard !splitImages.isEmpty else {
             showError(AppError.invalidCropArea)
             return
@@ -589,16 +497,12 @@ class PreviewViewController: UIViewController {
             do {
                 guard let self = self else { return }
                 
-                print("[PreviewViewController] 开始生成分享PDF")
                 let pdfData = try PDFGenerator.shared.generatePDF(from: self.splitImages)
-                print("[PreviewViewController] 分享PDF生成成功，数据大小: \(pdfData.count) bytes")
                 
-                // 验证PDF页数
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_share.pdf")
                 try pdfData.write(to: tempURL)
                 let verifyDoc = PDFDocument(url: tempURL)
                 let pageCount = verifyDoc?.pageCount ?? 0
-                print("[PreviewViewController] PDF验证页数: \(pageCount)")
                 
                 guard pageCount == self.splitImages.count else {
                     DispatchQueue.main.async { [weak self] in
@@ -647,13 +551,7 @@ class PreviewViewController: UIViewController {
 extension PreviewViewController: UIDocumentPickerDelegate {
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         guard let savedURL = urls.first else { return }
-        let pathAlert = UIAlertController(
-            title: "保存成功",
-            message: "文件已保存到：\n\(savedURL.lastPathComponent)",
-            preferredStyle: .alert
-        )
-        pathAlert.addAction(UIAlertAction(title: "确定", style: .default))
-        present(pathAlert, animated: true)
+        showSuccess("文件已保存到：\(savedURL.lastPathComponent)")
     }
     
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
