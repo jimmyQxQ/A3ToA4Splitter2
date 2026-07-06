@@ -65,11 +65,15 @@ jobs:
           BINARY_NAME=$(basename "$APP_PATH" .app)
           echo "Binary name: $BINARY_NAME"
           
+          # 先去掉 xcodebuild 自动加的 ad-hoc 签名
+          echo "====== Removing existing code signature ======"
+          codesign --remove-signature "$APP_PATH/$BINARY_NAME" 2>/dev/null || echo "No existing signature"
+
           # ldid 伪签名（TrollStore 必需）
           echo "====== ldid signing ======"
           ENTITLEMENTS="A3ToA4Splitter/A3ToA4Splitter.entitlements"
           if [ -f "$ENTITLEMENTS" ]; then
-            ldid -S "$ENTITLEMENTS" "$APP_PATH/$BINARY_NAME"
+            ldid -S"$ENTITLEMENTS" "$APP_PATH/$BINARY_NAME"
             echo "Signed with entitlements: $ENTITLEMENTS"
           else
             ldid -S "$APP_PATH/$BINARY_NAME"
