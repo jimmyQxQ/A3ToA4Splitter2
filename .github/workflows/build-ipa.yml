@@ -28,37 +28,37 @@ jobs:
           fi
           echo "ldid installed at: $(which ldid)"
 
-      - name: Prepare Build Directory
+      - name: Archive Project
         run: |
-          rm -rf build
-          mkdir -p build
-          xattr -w com.apple.xcode.CreatedByBuildSystem true build
-
-      - name: Build Project
-        run: |
-          xcodebuild build \
+          xcodebuild archive \
             -project A3ToA4Splitter.xcodeproj \
             -scheme ${{ env.SCHEME }} \
             -configuration ${{ env.CONFIGURATION }} \
+            -archivePath build/${{ env.SCHEME }}.xcarchive \
             -sdk ${{ env.SDK }} \
             -destination 'generic/platform=iOS' \
-            CONFIGURATION_BUILD_DIR="$(pwd)/build" \
-            ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             ONLY_ACTIVE_ARCH=NO \
             ARCHS="arm64" \
-            | tee build/build.log
+            ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
+            SKIP_INSTALL=NO
 
-      - name: Locate and Sign App
+      - name: Locate App
         run: |
           echo "====== Locating .app bundle ======"
           APP_PATH=$(find build -name "*.app" -type d | head -n 1)
           echo "APP_PATH=$APP_PATH"
           
           if [ -z "$APP_PATH" ]; then
-            echo "Error: .app bundle not found"
+            echo "Searching in archive..."
+            APP_PATH=$(find build/A3ToA4Splitter.xcarchive/Products -name "*.app" -type d | head -n 1)
+            echo "APP_PATH=$APP_PATH"
+          fi
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app bundle not found in archive"
             find build -type d
             exit 1
           fi
@@ -66,9 +66,28 @@ jobs:
           BINARY_NAME=$(basename "$APP_PATH" .app)
           echo "Binary name: $BINARY_NAME"
           
+          # 检查 Frameworks 目录是否存在 Swift 库
+          echo "====== Checking Frameworks ======"
+          FRAMEWORKS_DIR="$APP_PATH/Frameworks"
+          if [ -d "$FRAMEWORKS_DIR" ]; then
+            echo "Frameworks directory exists:"
+            ls -la "$FRAMEWORKS_DIR"
+          else
+            echo "Frameworks directory does NOT exist!"
+          fi
+
           # 先去掉 xcodebuild 自动加的 ad-hoc 签名
           echo "====== Removing existing code signature ======"
           codesign --remove-signature "$APP_PATH/$BINARY_NAME" 2>/dev/null || echo "No existing signature"
+          
+          # 移除所有动态库的签名
+          if [ -d "$FRAMEWORKS_DIR" ]; then
+            for framework in "$FRAMEWORKS_DIR"/*.framework; do
+              if [ -f "$framework/$(basename "$framework" .framework)" ]; then
+                codesign --remove-signature "$framework/$(basename "$framework" .framework)" 2>/dev/null || echo "No signature for $framework"
+              fi
+            done
+          fi
 
           # ldid 伪签名（TrollStore 必需）
           echo "====== ldid signing ======"
@@ -81,25 +100,41 @@ jobs:
             echo "Signed without entitlements"
           fi
           
+          # ldid 签名所有动态库
+          if [ -d "$FRAMEWORKS_DIR" ]; then
+            for framework in "$FRAMEWORKS_DIR"/*.framework; do
+              FRAMEWORK_BINARY="$framework/$(basename "$framework" .framework)"
+              if [ -f "$FRAMEWORK_BINARY" ]; then
+                ldid -S "$FRAMEWORK_BINARY"
+                echo "Signed $FRAMEWORK_BINARY"
+              fi
+            done
+          fi
+          
           codesign -d --entitlements :- "$APP_PATH" 2>/dev/null || true
-
+          
           # 检查架构
           echo "====== Checking architecture ======"
           lipo -info "$APP_PATH/$BINARY_NAME"
           file "$APP_PATH/$BINARY_NAME"
-
+          
           # 确保可执行权限
           chmod +x "$APP_PATH/$BINARY_NAME"
           ls -la "$APP_PATH/$BINARY_NAME"
-
+          
           echo "====== App bundle contents ======"
           ls -la "$APP_PATH"
           echo "====== Info.plist CFBundleExecutable ======"
           /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP_PATH/Info.plist" || true
 
+          echo "====== Save APP_PATH to file for packaging ======"
+          echo "$APP_PATH" > build/app_path.txt
+
       - name: Package IPA
         run: |
-          APP_PATH=$(find build -name "*.app" -type d | head -n 1)
+          APP_PATH=$(cat build/app_path.txt)
+          echo "Packaging $APP_PATH"
+          
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           
@@ -125,5 +160,6 @@ jobs:
             自动构建的 IPA 文件，适用于 TrollStore 安装。
             - 版本：${{ github.ref_name }}
             - 构建时间：${{ github.event.head_commit.timestamp }}
+            - 构建方式：xcodebuild archive 确保 Swift 运行库嵌入
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
