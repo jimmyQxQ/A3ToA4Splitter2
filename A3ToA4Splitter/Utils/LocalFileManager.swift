@@ -5,9 +5,9 @@ class LocalFileManager {
     static let shared = LocalFileManager()
     
     private let fileManager = FileManager.default
-    private let documentsPath: URL
-    private let appFolder: URL
-    private let metadataFile: URL
+    private var documentsPath: URL
+    private var appFolder: URL
+    private var metadataFile: URL
     
     private var documents: [SplitDocument] = []
     
