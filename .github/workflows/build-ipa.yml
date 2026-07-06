@@ -26,7 +26,7 @@ jobs:
           if ! command -v ldid &> /dev/null; then
             brew install ldid
           fi
-          ldid --version
+          echo "ldid installed at: $(which ldid)"
 
       - name: Prepare Build Directory
         run: |
@@ -68,7 +68,7 @@ jobs:
           echo "====== ldid signing ======"
           ENTITLEMENTS="A3ToA4Splitter/A3ToA4Splitter.entitlements"
           if [ -f "$ENTITLEMENTS" ]; then
-            ldid -S -e "$ENTITLEMENTS" "$APP_PATH/$BINARY_NAME"
+            ldid -S "$ENTITLEMENTS" "$APP_PATH/$BINARY_NAME"
             echo "Signed with entitlements: $ENTITLEMENTS"
           else
             ldid -S "$APP_PATH/$BINARY_NAME"
