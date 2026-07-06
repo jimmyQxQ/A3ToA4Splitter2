@@ -175,6 +175,7 @@ class PreviewViewController: UIViewController {
     private let fileURL: URL
     private let documentType: DocumentType
     var existingDocument: SplitDocument?
+    private let pdfTotalPages: Int  // 原始PDF的总页数（图片为1）
     
     private var originalImage: UIImage?
     private var pdfDocument: PDFDocument?
@@ -183,9 +184,10 @@ class PreviewViewController: UIViewController {
     private var splitImages: [UIImage] = []
     
     // MARK: - Initialization
-    init(fileURL: URL, documentType: DocumentType) {
+    init(fileURL: URL, documentType: DocumentType, totalPages: Int = 1) {
         self.fileURL = fileURL
         self.documentType = documentType
+        self.pdfTotalPages = totalPages
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -333,9 +335,15 @@ class PreviewViewController: UIViewController {
                     let (pdf, orientation) = try DocumentProcessor.shared.importPDF(from: self.fileURL)
                     self.pdfDocument = pdf
                     self.documentOrientation = orientation
-                    self.splitImages = try DocumentProcessor.shared.splitA3ToA4(pdfDocument: pdf, orientation: orientation)
                     
-                    // 生成预览图
+                    // 分割所有页面
+                    if self.pdfTotalPages > 1 {
+                        self.splitImages = try DocumentProcessor.shared.splitAllPages(pdfDocument: pdf, orientation: orientation)
+                    } else {
+                        self.splitImages = try DocumentProcessor.shared.splitA3ToA4(pdfDocument: pdf, orientation: orientation)
+                    }
+                    
+                    // 生成第一页预览图
                     if let firstPage = pdf.page(at: 0) {
                         let bounds = firstPage.bounds(for: .mediaBox)
                         let renderer = UIGraphicsImageRenderer(size: CGSize(width: bounds.width, height: bounds.height))
@@ -351,12 +359,15 @@ class PreviewViewController: UIViewController {
                     }
                 }
                 
+                print("[PreviewViewController] 加载完成，splitImages数量: \(self.splitImages.count)")
+                
                 DispatchQueue.main.async { [weak self] in
                     self?.activityIndicator.stopAnimating()
                     self?.updateUI()
                     self?.updatePreviewImages()
                 }
             } catch {
+                print("[PreviewViewController] 加载文档失败: \(error.localizedDescription)")
                 DispatchQueue.main.async { [weak self] in
                     self?.activityIndicator.stopAnimating()
                     self?.showError(error)
@@ -377,7 +388,11 @@ class PreviewViewController: UIViewController {
         infoLabel.text = String(format: "原始尺寸: %.0f x %.0f 像素 | 方向: %@",
                                 size.width, size.height,
                                 documentOrientation == .landscape ? "横向A3" : "纵向A3")
-        outputInfoLabel.text = "将输出 1 份 2 页 A4 PDF"
+        if pdfTotalPages > 1 {
+            outputInfoLabel.text = "将输出 1 份 \(pdfTotalPages * 2) 页 A4 PDF（\(pdfTotalPages) 页 A3 → 每页分割为 2 页 A4）"
+        } else {
+            outputInfoLabel.text = "将输出 1 份 2 页 A4 PDF"
+        }
         
         slider.value = 0.5
     }
@@ -405,11 +420,19 @@ class PreviewViewController: UIViewController {
                         cropConfig: self.cropConfig
                     )
                 } else if let pdf = self.pdfDocument {
-                    self.splitImages = try DocumentProcessor.shared.splitA3ToA4(
-                        pdfDocument: pdf,
-                        orientation: self.documentOrientation,
-                        cropConfig: self.cropConfig
-                    )
+                    if self.pdfTotalPages > 1 {
+                        self.splitImages = try DocumentProcessor.shared.splitAllPages(
+                            pdfDocument: pdf,
+                            orientation: self.documentOrientation,
+                            cropConfig: self.cropConfig
+                        )
+                    } else {
+                        self.splitImages = try DocumentProcessor.shared.splitA3ToA4(
+                            pdfDocument: pdf,
+                            orientation: self.documentOrientation,
+                            cropConfig: self.cropConfig
+                        )
+                    }
                 }
                 
                 DispatchQueue.main.async { [weak self] in
@@ -465,7 +488,7 @@ class PreviewViewController: UIViewController {
     
     @objc private func savePDF() {
         print("[PreviewViewController] 点击保存PDF，splitImages数量: \(splitImages.count)")
-        guard splitImages.count == 2 else {
+        guard !splitImages.isEmpty else {
             showError(AppError.invalidCropArea)
             return
         }
@@ -476,7 +499,7 @@ class PreviewViewController: UIViewController {
             do {
                 guard let self = self else { return }
                 
-                print("[PreviewViewController] 开始生成PDF，splitImages[0]: \(self.splitImages[0].size), splitImages[1]: \(self.splitImages[1].size)")
+                print("[PreviewViewController] 开始生成PDF，共 \(self.splitImages.count) 张图片")
                 let pdfData = try PDFGenerator.shared.generatePDF(from: self.splitImages)
                 print("[PreviewViewController] PDF生成成功，数据大小: \(pdfData.count) bytes")
                 
@@ -485,7 +508,8 @@ class PreviewViewController: UIViewController {
                 let pageCount = verifyDoc?.pageCount ?? 0
                 print("[PreviewViewController] PDF验证页数: \(pageCount)")
                 
-                guard pageCount == 2 else {
+                let expectedPages = self.splitImages.count
+                guard pageCount == expectedPages else {
                     DispatchQueue.main.async { [weak self] in
                         self?.activityIndicator.stopAnimating()
                         self?.showError(AppError.pdfGenerationFailed)
@@ -618,7 +642,7 @@ class PreviewViewController: UIViewController {
     
     @objc private func sharePDF() {
         print("[PreviewViewController] 点击分享PDF，splitImages数量: \(splitImages.count)")
-        guard splitImages.count == 2 else {
+        guard !splitImages.isEmpty else {
             showError(AppError.invalidCropArea)
             return
         }
@@ -640,7 +664,7 @@ class PreviewViewController: UIViewController {
                 let pageCount = verifyDoc?.pageCount ?? 0
                 print("[PreviewViewController] PDF验证页数: \(pageCount)")
                 
-                guard pageCount == 2 else {
+                guard pageCount == self.splitImages.count else {
                     DispatchQueue.main.async { [weak self] in
                         self?.activityIndicator.stopAnimating()
                         self?.showError(AppError.pdfGenerationFailed)

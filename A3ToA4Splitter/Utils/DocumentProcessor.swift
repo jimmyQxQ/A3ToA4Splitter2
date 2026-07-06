@@ -130,7 +130,7 @@ class DocumentProcessor {
         return splitImages
     }
     
-    // MARK: - PDF分割
+    // MARK: - PDF分割（单页）
     func splitA3ToA4(pdfDocument: PDFDocument, orientation: DocumentOrientation, cropConfig: CropConfiguration = .default) throws -> [UIImage] {
         guard let firstPage = pdfDocument.page(at: 0) else {
             throw AppError.pdfGenerationFailed
@@ -151,6 +151,48 @@ class DocumentProcessor {
         }
         
         return try splitA3ToA4(image: pageImage, orientation: orientation, cropConfig: cropConfig)
+    }
+    
+    // MARK: - PDF分割（多页）——遍历每一页，每页A3分割为2页A4
+    func splitAllPages(pdfDocument: PDFDocument, orientation: DocumentOrientation, cropConfig: CropConfiguration = .default) throws -> [UIImage] {
+        let pageCount = pdfDocument.pageCount
+        print("[DocumentProcessor] 开始分割多页PDF，总页数: \(pageCount)")
+        guard pageCount > 0 else {
+            throw AppError.pdfGenerationFailed
+        }
+        
+        var allSplitImages: [UIImage] = []
+        let scale: CGFloat = 2.0
+        
+        for pageIndex in 0..<pageCount {
+            guard let page = pdfDocument.page(at: pageIndex) else {
+                print("[DocumentProcessor] 警告: 第 \(pageIndex + 1) 页无法读取，跳过")
+                continue
+            }
+            
+            let pageBounds = page.bounds(for: .mediaBox)
+            // 检测每页的方向
+            let pageRatio = pageBounds.width / pageBounds.height
+            let pageOrientation: DocumentOrientation = pageRatio < 1.0 ? .portrait : .landscape
+            
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: pageBounds.width * scale, height: pageBounds.height * scale))
+            let pageImage = renderer.image { context in
+                UIColor.white.set()
+                context.fill(context.format.bounds)
+                context.cgContext.saveGState()
+                context.cgContext.translateBy(x: 0, y: pageBounds.height * scale)
+                context.cgContext.scaleBy(x: scale, y: -scale)
+                page.draw(with: .mediaBox, to: context.cgContext)
+                context.cgContext.restoreGState()
+            }
+            
+            let splitParts = try splitA3ToA4(image: pageImage, orientation: pageOrientation, cropConfig: cropConfig)
+            print("[DocumentProcessor] 第 \(pageIndex + 1) 页分割完成，产出 \(splitParts.count) 张A4图片")
+            allSplitImages.append(contentsOf: splitParts)
+        }
+        
+        print("[DocumentProcessor] 多页PDF分割完成，总产出: \(allSplitImages.count) 张A4图片")
+        return allSplitImages
     }
     
     // MARK: - 图片裁切

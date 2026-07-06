@@ -427,24 +427,37 @@ class MainViewController: UIViewController {
     
     // MARK: - Document Processing
     private func processImportedFile(at url: URL) {
+        print("[MainViewController] 开始处理导入文件: \(url.lastPathComponent), 是否可访问: \(FileManager.default.isReadableFile(atPath: url.path))")
         activityIndicator.startAnimating()
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
+                // 1. 先复制文件到应用目录（处理安全范围URL）
                 let fileName = url.lastPathComponent
                 let savedURL = try LocalFileManager.shared.saveOriginalFile(from: url, fileName: fileName)
+                print("[MainViewController] 文件已复制到: \(savedURL.path), 大小: \(FileManager.default.fileSize(atPath: savedURL.path) ?? 0) bytes")
                 
+                // 2. 检测文件类型
                 guard let docType = DocumentProcessor.shared.detectDocumentType(from: savedURL) else {
                     throw AppError.invalidFileFormat
+                }
+                print("[MainViewController] 文件类型: \(docType == .image ? "图片" : "PDF")")
+                
+                // 3. 获取PDF页数信息
+                var pageCount = 1
+                if docType == .pdf, let pdfDoc = PDFDocument(url: savedURL) {
+                    pageCount = pdfDoc.pageCount
+                    print("[MainViewController] PDF页数: \(pageCount)")
                 }
                 
                 DispatchQueue.main.async {
                     self?.activityIndicator.stopAnimating()
                     
-                    let previewVC = PreviewViewController(fileURL: savedURL, documentType: docType)
+                    let previewVC = PreviewViewController(fileURL: savedURL, documentType: docType, totalPages: pageCount)
                     self?.navigationController?.pushViewController(previewVC, animated: true)
                 }
             } catch {
+                print("[MainViewController] 导入失败: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     self?.activityIndicator.stopAnimating()
                     self?.showError(error)

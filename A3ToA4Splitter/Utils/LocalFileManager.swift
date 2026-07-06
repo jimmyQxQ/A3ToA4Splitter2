@@ -79,7 +79,27 @@ class LocalFileManager {
             try fileManager.removeItem(at: destinationURL)
         }
         
-        try fileManager.copyItem(at: url, to: destinationURL)
+        // 处理安全范围的URL（iOS文档选择器返回的URL）
+        let sourceURL: URL
+        if url.startAccessingSecurityScopedResource() {
+            defer { url.stopAccessingSecurityScopedResource() }
+            sourceURL = url
+        } else {
+            sourceURL = url
+        }
+        
+        // 如果源文件和目标文件路径相同，直接返回
+        if sourceURL.path == destinationURL.path {
+            return destinationURL
+        }
+        
+        try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        
+        // 验证文件已成功复制
+        guard fileManager.fileExists(atPath: destinationURL.path) else {
+            throw AppError.importFailed("文件复制失败")
+        }
+        
         return destinationURL
     }
     
